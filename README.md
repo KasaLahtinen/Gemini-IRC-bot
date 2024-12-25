@@ -25,7 +25,7 @@ This Python code implements a functional IRC bot named MyPythonBot. While the co
 
 2. **Configuration:**
 
-   Edit the `config` dictionary in `__main__.py` to set your desired IRC server details:
+   Edit the `config` dictionary in `bot.py` to set your desired IRC server details:
 
    ```python
    config = {
@@ -39,7 +39,7 @@ This Python code implements a functional IRC bot named MyPythonBot. While the co
 3. **Run the bot:**
 
    ```bash
-   python __main__.py
+   python bot.py
    ```
 
 **Available Commands**
