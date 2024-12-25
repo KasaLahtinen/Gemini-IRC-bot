@@ -30,6 +30,9 @@ While these tools played a key role in the rapid prototyping and development of 
     *   `validators`: `pip install validators`
     *   `blessed`: `pip install blessed`
     *   `pyyaml`: `pip install pyyaml`
+    *   `requests`: `pip install requests`
+    *   `psutil`: `pip install psutil`
+    *   `bs4`: `pip install BeautifulSoup4`
 
 **## Usage**
 
