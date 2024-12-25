@@ -45,7 +45,7 @@ class IRCBot:
     def connect(self):
         """Connects to the IRC server with enhanced error handling."""
         try:
-            if self.config["connection"]["use_ssl"]:
+            if self.config['connection']["use_ssl"]:
                 context = ssl.create_default_context()
                 context.verify_mode = ssl.CERT_REQUIRED
                 context.check_hostname = True
@@ -53,18 +53,18 @@ class IRCBot:
 
                 raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.socket = context.wrap_socket(
-                    raw_socket, server_hostname=self.config["connection"]["server"]
+                    raw_socket, server_hostname=self.config['connection']["server"]
                 )
             else:
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
             self.socket.settimeout(10)  # Set a timeout for the connect operation
             self.socket.connect((
-                self.config["connection"]["server"], self.config["connection"]["port"]
+                self.config['connection']["server"], self.config['connection']["port"]
             ))
             self.socket.settimeout(None)  # Remove timeout after successful connection
 
-            if self.config["connection"]["password"]:
+            if self.config['connection']["password"]:
                 self.send_raw(f"PASS {self.config['connection']['password']}\r\n")
             self.send_raw(f"NICK {self.nickname}\r\n")
             self.send_raw(f"USER {self.nickname} 0 * :{self.nickname}\r\n")
@@ -74,16 +74,16 @@ class IRCBot:
 
         except ssl.SSLError as e:
             print(term.red(f"SSL error connecting to "
-                           f"{self.config["connection"]['server']}:"
-                           f"{self.config["connection"]['port']}: {e}"))
+                           f"{self.config['connection']['server']}:"
+                           f"{self.config['connection']['port']}: {e}"))
             return False
         except socket.timeout:
-            print(term.red(f"Connection to {self.config["connection"]['server']}:"
-                           f"{self.config["connection"]['port']} timed out."))
+            print(term.red(f"Connection to {self.config['connection']['server']}:"
+                           f"{self.config['connection']['port']} timed out."))
             return False
         except socket.error as e:
-            print(term.red(f"Error connecting to {self.config["connection"]['server']}:"
-                           f"{self.config["connection"]['port']}: {e}"))
+            print(term.red(f"Error connecting to {self.config['connection']['server']}:"
+                           f"{self.config['connection']['port']}: {e}"))
             return False
         return True
 
