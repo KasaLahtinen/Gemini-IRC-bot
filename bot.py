@@ -39,7 +39,8 @@ class IRCBot:
         self.command_handlers = {}
         self.nickname = self.config["bot"]["nickname"]
         self.channels = self.config["bot"]["channels"]
-        self.thread_pool_size = self.config.get("thread_pool_size", 4) #Get thread_pool_size with a default value
+        # Get thread_pool_size with a default value
+        self.thread_pool_size = self.config.get("thread_pool_size", 4)
 
     def connect(self):
         """Connects to the IRC server with enhanced error handling."""
@@ -58,7 +59,9 @@ class IRCBot:
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
             self.socket.settimeout(10)  # Set a timeout for the connect operation
-            self.socket.connect((self.config["connection"]["server"], self.config["connection"]["port"]))
+            self.socket.connect((
+                self.config["connection"]["server"], self.config["connection"]["port"]
+            ))
             self.socket.settimeout(None)  # Remove timeout after successful connection
 
             if self.config["connection"]["password"]:
