@@ -8,6 +8,8 @@ import threading
 import queue
 import traceback
 import mimetypes
+import time
+import psutil
 import chardet
 import validators
 from blessed import Terminal
@@ -21,6 +23,7 @@ term = Terminal()
 
 class IRCBot:
     """IRC Bot class"""
+
 
     def _load_config(self):
         """Loads the configuration from the YAML file."""
@@ -45,6 +48,12 @@ class IRCBot:
         self.channels = self.config["bot"]["channels"]
         # Get thread_pool_size with a default value
 #        self.thread_pool_size = self.config.get("thread_pool_size", 4)
+
+    def resource_monitor(self, interval=600):
+        """ Resource monitoring """
+        while self.running:
+            log_resource_usage()
+            time.sleep(interval)
 
     def connect(self):
         """Connects to the IRC server with enhanced error handling."""
@@ -268,6 +277,7 @@ class IRCBot:
 
     def process_data(self, raw_data):
         """Processes incoming raw data."""
+        start_time = time.time()
         try:
             data = self._decode_data(raw_data)
 
@@ -303,6 +313,10 @@ class IRCBot:
         except (UnicodeDecodeError, IOError) as e:
             print(term.red(f"Error in process_data: {e}"))
             traceback.print_exc()
+        finally:
+            processing_time = time.time() - start_time
+            print(term.yellow(f"Processed message in {processing_time:.4f} seconds"))
+
 
     # ... (rest of the IRCBot class and other functions)
     def handle_command(self, target, message, sender=None):
@@ -370,6 +384,9 @@ class IRCBot:
             channel_threads[channel] = thread
             thread.daemon = True
             thread.start()
+        resource_thread = threading.Thread(target=self.resource_monitor, daemon=True)
+        resource_thread.start()
+
 
         try:
             while self.running:
@@ -427,6 +444,13 @@ def join_command(bot, target, sender, *args):
     else:
         bot.send_message(target, "Usage: !join #channel")
 
+def log_resource_usage():
+    """ Log resource usage """
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    cpu_percent = process.cpu_percent(interval=1)
+    print(term.blue(f"Memory usage: {memory_info.rss / 1024 / 1024:.2f} MB"))
+    print(term.blue(f"CPU usage: {cpu_percent:.2f}%"))
 
 if __name__ == "__main__":
     Bot = IRCBot()
