@@ -1,3 +1,4 @@
+"""This module contains the IRCBot class and its related functions."""
 import socket
 import ssl
 import re
@@ -11,6 +12,7 @@ from blessed import Terminal
 term = Terminal()
 
 class IRCBot:
+    """IRC Bot class"""
     def __init__(self, server, port, nickname, channels, use_ssl=False, password=None):
         """Initializes the IRC bot."""
         self.server = server
@@ -22,7 +24,7 @@ class IRCBot:
         self.socket = None
         self.running = True
         self.command_handlers = {}
-    
+
     def connect(self):
         """Connects to the IRC server with enhanced error handling."""
         try:
@@ -99,7 +101,7 @@ class IRCBot:
                 else:
                     data = raw_data.decode('latin-1', errors='replace')
                     print(term.green("Fallback to latin-1"))
-            except (UnicodeDecodeError, IOError) as e:
+            except IOError as e:
                 print(term.red(f"Error decoding data: {e}"))
                 traceback.print_exc()
                 data = raw_data.decode('latin-1', errors='replace')
@@ -118,9 +120,8 @@ class IRCBot:
                 match = re.search(r"^:([^!]+)!.* (JOIN) :(.+)$", line)
                 if match:
                     nick = match.group(1)
-                    command = match.group(2)
-                    channel = match.group(3)
                     if nick == self.nickname:
+                        channel = match.group(3)
                         if channel not in self.channels:
                             self.channels.append(channel)
                         print(term.green(f"Bot successfully joined {channel}"))
@@ -209,7 +210,6 @@ class IRCBot:
         if not self.connect():
             print(term.red("Reconnection failed."))
             self.running = False
-            return
 
     def run(self):
         """Main bot loop with robust error handling and reconnection."""
