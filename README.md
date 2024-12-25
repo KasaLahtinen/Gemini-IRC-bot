@@ -1,8 +1,6 @@
-I apologize for the misunderstanding. You cannot directly download files through text prompts. However, I can copy the content of the README.md file for you:
-
 ## MyPythonBot: An IRC Bot built with Generative AI Assistance
 
-This Python code implements a functional IRC bot named MyPythonBot. While the core functionalities were written and designed by humans, the development process was assisted by generative AI models from Google, including:
+This Python code implements a functional IRC bot named MyPythonBot. While the core functionalities were written and designed by humans, the development process was assisted by generative AI models, including:
 
 * **Gemini**: Provided a base structure and core functionalities for the bot.
 * **ChatGPT**: Offered suggestions for improvements and potential use cases.
