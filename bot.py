@@ -1,5 +1,6 @@
 """This module contains the IRCBot class and its related functions."""
 
+import sys
 import socket
 import ssl
 import re
@@ -10,7 +11,7 @@ import chardet
 import validators
 from blessed import Terminal
 import yaml
-#import os
+
 
 term = Terminal()
 
@@ -25,10 +26,10 @@ class IRCBot:
                 return yaml.safe_load(f)  # Use yaml.safe_load()
         except FileNotFoundError:
             print(term.red(f"Error: Configuration file '{self.config_file}' not found."))
-            exit(1)
+            sys.exit(1)
         except yaml.YAMLError as e: #Catch yaml errors
             print(term.red(f"Error: Invalid YAML in configuration file: {e}"))
-            exit(1)
+            sys.exit(1)
 
     def __init__(self, config_file="config.yaml"): #Set default to yaml
         """Initializes the IRC bot from a configuration file."""
@@ -40,7 +41,7 @@ class IRCBot:
         self.nickname = self.config["bot"]["nickname"]
         self.channels = self.config["bot"]["channels"]
         # Get thread_pool_size with a default value
-        self.thread_pool_size = self.config.get("thread_pool_size", 4)
+#        self.thread_pool_size = self.config.get("thread_pool_size", 4)
 
     def connect(self):
         """Connects to the IRC server with enhanced error handling."""
