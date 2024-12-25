@@ -65,7 +65,7 @@ class IRCBot:
             self.socket.settimeout(None)  # Remove timeout after successful connection
 
             if self.config["connection"]["password"]:
-                self.send_raw(f"PASS {self.config["connection"]['password']}\r\n")
+                self.send_raw(f"PASS {self.config['connection']['password']}\r\n")
             self.send_raw(f"NICK {self.nickname}\r\n")
             self.send_raw(f"USER {self.nickname} 0 * :{self.nickname}\r\n")
 
