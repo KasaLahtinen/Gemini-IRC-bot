@@ -103,25 +103,71 @@ class IRCBot:
         except (UnicodeEncodeError, IOError) as e:
             print(term.red(f"Error sending message to {target}: {e}"))
 
-    def process_data(self, raw_data):
-        """Processes incoming raw data, handles encoding errors, JOIN responses, and URLs."""
+    def _decode_data(self, raw_data):
+        """Decodes raw data, handling encoding errors."""
         try:
-            try:
-                data = raw_data.decode("utf-8")
-            except UnicodeDecodeError:
-                encoding_result = chardet.detect(raw_data)
-                encoding = encoding_result["encoding"]
-                if encoding:
-                    data = raw_data.decode(encoding)
-                    print(term.green(f"Detected encoding: {encoding}"))
-                else:
-                    data = raw_data.decode("latin-1", errors="replace")
-                    print(term.green("Fallback to latin-1"))
-            except IOError as e:
-                print(term.red(f"Error decoding data: {e}"))
-                traceback.print_exc()
-                data = raw_data.decode("latin-1", errors="replace")
+            return raw_data.decode("utf-8")
+        except UnicodeDecodeError:
+            encoding_result = chardet.detect(raw_data)
+            encoding = encoding_result["encoding"]
+            if encoding:
+                decoded_data = raw_data.decode(encoding)
+                print(term.green(f"Detected encoding: {encoding}"))
+                return decoded_data
+            else:
+                decoded_data = raw_data.decode("latin-1", errors="replace")
                 print(term.green("Fallback to latin-1"))
+                return decoded_data
+        except IOError as e:
+            print(term.red(f"Error decoding data: {e}"))
+            traceback.print_exc()
+            decoded_data = raw_data.decode("latin-1", errors="replace")
+            print(term.green("Fallback to latin-1"))
+            return decoded_data
+
+    def _handle_ping(self, line):
+        """Handles PING messages."""
+        self.send_raw(f"PONG {line.split()[1]}\r\n")
+
+    def _handle_join(self, nick, channel):
+        """Handles JOIN messages."""
+        if nick == self.nickname:
+            if channel not in self.channels:
+                self.channels.append(channel)
+            print(term.green(f"Bot successfully joined {channel}"))
+
+    def _handle_numeric_reply(self, reply_code, reply_text):
+        """Handles numeric replies (error codes)."""
+        error_messages = {
+            "473": "Error joining channel: Invite only.",
+            "475": "Error joining channel: Bad channel key.",
+            "471": "Error joining channel: Channel is full.",
+            "403": "Error joining channel: No such channel.",
+        }
+        if reply_code in error_messages:
+            print(term.red(f"{error_messages[reply_code]} {reply_text}"))
+
+    def _handle_url(self, url):
+        """Handles URL detection and validation."""
+        print(term.green(f"Detected URL: {url}"))
+        if validators.url(url):
+            print(term.green(f"{url} is a valid URL"))
+        else:
+            print(term.red(f"{url} is not a valid URL"))
+
+    def _handle_privmsg(self, sender, target, message):
+        """Handles PRIVMSG (chat messages)."""
+        if target == self.nickname:
+            print(term.green(f"Private message from {sender}: {message}"))
+            self.handle_command(sender, message)
+        else:
+            print(term.green(f"Message in {target} from {sender}: {message}"))
+            self.handle_command(target, message, sender)
+
+    def process_data(self, raw_data):
+        """Processes incoming raw data."""
+        try:
+            data = self._decode_data(raw_data)
 
             for line in data.splitlines():
                 line = line.strip()
@@ -130,73 +176,34 @@ class IRCBot:
                 print(f"Received: {line}")
 
                 if line.startswith("PING"):
-                    self.send_raw(f"PONG {line.split()[1]}\r\n")
+                    self._handle_ping(line)
                     continue
 
                 match = re.search(r"^:([^!]+)!.* (JOIN) :(.+)$", line)
                 if match:
                     nick = match.group(1)
-                    if nick == self.nickname:
-                        channel = match.group(3)
-                        if channel not in self.channels:
-                            self.channels.append(channel)
-                        print(term.green(f"Bot successfully joined {channel}"))
+                    channel = match.group(3)
+                    self._handle_join(nick, channel)
                     continue
 
                 match = re.search(r"^:[^ ]+ ([0-9]{3}) .+ :(.+)$", line)
                 if match:
                     reply_code = match.group(1)
                     reply_text = match.group(2)
-                    if reply_code == "473":
-                        print(
-                            term.red(
-                                f"Error joining channel: Invite only. {reply_text}"
-                            )
-                        )
-                    elif reply_code == "475":
-                        print(
-                            term.red(
-                                f"Error joining channel: Bad channel key. {reply_text}"
-                            )
-                        )
-                    elif reply_code == "471":
-                        print(
-                            term.red(
-                                f"Error joining channel: Channel is full. {reply_text}"
-                            )
-                        )
-                    elif reply_code == "403":
-                        print(
-                            term.red(
-                                f"Error joining channel: No such channel. {reply_text}"
-                            )
-                        )
+                    self._handle_numeric_reply(reply_code, reply_text)
                     continue
 
-                # Handle URL detection (HTTP/HTTPS only)
                 url_match = re.findall(r"\b(https?:\/\/[^\s]+)", line)
                 if url_match:
                     for url in url_match:
-                        print(term.green(f"Detected URL: {url}"))
-                        if validators.url(url):
-                            print(term.green(f"{url} is a valid URL"))
-                        else:
-                            print(term.red(f"{url} is not a valid URL"))
+                        self._handle_url(url)
 
                 match = re.search(r"^:([^!]+)!.* PRIVMSG ([^ ]+) :(.+)$", line)
                 if match:
                     sender = match.group(1)
                     target = match.group(2)
                     message = match.group(3)
-
-                    if target == self.nickname:
-                        print(term.green(f"Private message from {sender}: {message}"))
-                        self.handle_command(sender, message)
-                    else:
-                        print(
-                            term.green(f"Message in {target} from {sender}: {message}")
-                        )
-                        self.handle_command(target, message, sender)
+                    self._handle_privmsg(sender, target, message)
 
         except (UnicodeDecodeError, IOError) as e:
             print(term.red(f"Error in process_data: {e}"))
