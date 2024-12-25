@@ -1,6 +1,6 @@
 """This module contains the IRCBot class and its related functions."""
 import socket
-import ssl
+#import ssl
 import re
 import threading
 import queue
@@ -69,7 +69,7 @@ class IRCBot:
         except socket.error as e:
             print(term.red(f"Error sending message: {e}"))
             self.reconnect()
-        except (UnicodeEncodeError, IOError) as e:
+        except (UnicodeEncodeError) as e:
             print(term.red(f"An unexpected error occurred while sending: {e}"))
             traceback.print_exc()
 
@@ -178,7 +178,9 @@ class IRCBot:
                 try:
                     self.command_handlers[command](self, target, sender, *args)
                 except TypeError as e:
-                    print(term.red(f"Error executing command {command}: {e}. Check function signature."))
+                    print(term.red(
+                        f"Error executing command {command}: {e}. Check function signature."
+                    ))
                 except (ValueError, IOError) as e:
                     print(term.red(f"An error occurred while executing command {command}: {e}"))
                     traceback.print_exc()
@@ -243,7 +245,7 @@ class IRCBot:
                 except socket.error as e:
                     print(term.red(f"Socket error: {e}"))
                     self.reconnect()
-                except (UnicodeDecodeError, IOError) as e:
+                except (UnicodeDecodeError) as e:
                     print(term.red(f"An unexpected error occurred in main loop: {e}"))
                     traceback.print_exc()
                     self.running = False
@@ -256,7 +258,7 @@ class IRCBot:
                 thread.join(timeout=2)
             self.disconnect()
 
-def hello_command(bot, target, sender, *args):
+def hello_command(bot, target, sender):
     """Responds with a greeting."""
     if sender:
         bot.send_message(target, f"Hello, {sender}!")
