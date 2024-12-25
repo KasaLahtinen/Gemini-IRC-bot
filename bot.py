@@ -4,8 +4,8 @@ import ssl
 import re
 import threading
 import queue
-import chardet
 import traceback
+import chardet
 import validators
 from blessed import Terminal
 
