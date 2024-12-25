@@ -45,10 +45,10 @@ class IRCBot:
                 self.join_channel(channel)
 
         except socket.timeout:
-            print(f"Connection to {self.server}:{self.port} timed out.")
+            print(term.red(f"Connection to {self.server}:{self.port} timed out."))
             return False
         except socket.error as e:
-            print(f"Error connecting to {self.server}:{self.port}: {e}")
+            print(term.red(f"Error connecting to {self.server}:{self.port}: {e}"))
             return False
         return True
 
@@ -59,19 +59,20 @@ class IRCBot:
                 self.send_raw("QUIT :Goodbye\r\n")
                 self.socket.close()
         except socket.error as e:
-            print(f"Error during disconnection: {e}")
+            print(term.red(f"Error during disconnection: {e}"))
+
     def send_raw(self, message):
         """Sends a raw message with error handling."""
         try:
             if self.socket:
                 self.socket.send(message.encode('utf-8'))
             else:
-                print("Socket is not connected. Cannot send message.")
+                print(term.red("Socket is not connected. Cannot send message."))
         except socket.error as e:
-            print(f"Error sending message: {e}")
+            print(term.red(f"Error sending message: {e}"))
             self.reconnect()
         except Exception as e:
-            print(f"An unexpected error occurred while sending: {e}")
+            print(term.red(f"An unexpected error occurred while sending: {e}"))
             traceback.print_exc()
 
     def join_channel(self, channel):
@@ -79,14 +80,14 @@ class IRCBot:
         try:
             self.send_raw(f"JOIN {channel}\r\n")
         except Exception as e:
-            print(f"Error joining channel {channel}: {e}")
+            print(term.red(f"Error joining channel {channel}: {e}"))
 
     def send_message(self, target, message):
         """Sends a message with error handling."""
         try:
             self.send_raw(f"PRIVMSG {target} :{message}\r\n")
         except Exception as e:
-            print(f"Error sending message to {target}: {e}")
+            print(term.red(f"Error sending message to {target}: {e}"))
 
     def send_raw(self, message):
         """Sends a raw message with error handling."""
@@ -94,12 +95,12 @@ class IRCBot:
             if self.socket:
                 self.socket.send(message.encode('utf-8'))
             else:
-                print("Socket is not connected. Cannot send message.")
+                print(term.red("Socket is not connected. Cannot send message."))
         except socket.error as e:
-            print(f"Error sending message: {e}")
+            print(term.red(f"Error sending message: {e}"))
             self.reconnect()
         except Exception as e:
-            print(f"An unexpected error occurred while sending: {e}")
+            print(term.red(f"An unexpected error occurred while sending: {e}"))
             traceback.print_exc()
 
     def join_channel(self, channel):
@@ -108,7 +109,7 @@ class IRCBot:
             self.send_raw(f"JOIN {channel}\r\n")
             return True # Assume the join command was sent successfully
         except Exception as e:
-            print(f"Error sending JOIN command for {channel}: {e}")
+            print(term.red(f"Error sending JOIN command for {channel}: {e}"))
             traceback.print_exc()
             return False
 
@@ -117,7 +118,7 @@ class IRCBot:
         try:
             self.send_raw(f"PRIVMSG {target} :{message}\r\n")
         except Exception as e:
-            print(f"Error sending message to {target}: {e}")
+            print(term.red(f"Error sending message to {target}: {e}"))
 
     def process_data(self, raw_data):
         """Processes incoming raw data, handles encoding errors, JOIN responses, and URLs."""
@@ -129,21 +130,21 @@ class IRCBot:
                 encoding = encoding_result['encoding']
                 if encoding:
                     data = raw_data.decode(encoding)
-                    print(f"Detected encoding: {encoding}")
+                    print(term.green(f"Detected encoding: {encoding}"))
                 else:
                     data = raw_data.decode('latin-1', errors='replace')
-                    print("Fallback to latin-1")
+                    print(term.green("Fallback to latin-1"))
             except Exception as e:
-                print(f"Error decoding data: {e}")
+                print(term.red(f"Error decoding data: {e}"))
                 traceback.print_exc()
                 data = raw_data.decode('latin-1', errors='replace')
-                print("Fallback to latin-1")
+                print(term.green("Fallback to latin-1"))
 
             for line in data.splitlines():
                 line = line.strip()
                 if not line:
                     continue
-                print(f"Received: {line}")
+                print(term.green(f"Received: {line}"))
 
                 if line.startswith("PING"):
                     self.send_raw(f"PONG {line.split()[1]}\r\n")
@@ -157,7 +158,7 @@ class IRCBot:
                     if nick == self.nickname:
                         if channel not in self.channels:
                             self.channels.append(channel)
-                        print(f"Bot successfully joined {channel}")
+                        print(term.green(f"Bot successfully joined {channel}"))
                     continue
 
                 match = re.search(r"^:[^ ]+ ([0-9]{3}) .+ :(.+)$", line)
@@ -165,26 +166,24 @@ class IRCBot:
                     reply_code = match.group(1)
                     reply_text = match.group(2)
                     if reply_code == "473":
-                        print(f"Error joining channel: Invite only. {reply_text}")
+                        print(term.red(f"Error joining channel: Invite only. {reply_text}"))
                     elif reply_code == "475":
-                        print(f"Error joining channel: Bad channel key. {reply_text}")
+                        print(term.red(f"Error joining channel: Bad channel key. {reply_text}"))
                     elif reply_code == "471":
-                        print(f"Error joining channel: Channel is full. {reply_text}")
+                        print(term.red(f"Error joining channel: Channel is full. {reply_text}"))
                     elif reply_code == "403":
-                        print(f"Error joining channel: No such channel. {reply_text}")
+                        print(term.red(f"Error joining channel: No such channel. {reply_text}"))
                     continue
 
                 # Handle URL detection (HTTP/HTTPS only)
                 url_match = re.findall(r"\b(https?:\/\/[^\s]+)", line)
                 if url_match:
                     for url in url_match:
-                        print(f"Detected URL: {url}")
+                        print(term.green(f"Detected URL: {url}"))
                         if validators.url(url):
-                            print(f"{url} is a valid URL")
-                            # Example: Send a message to the channel
-                            # self.send_message(target, f"Detected URL: {url}")
+                            print(term.green(f"{url} is a valid URL"))
                         else:
-                            print(f"{url} is not a valid URL")
+                            print(term.red(f"{url} is not a valid URL"))
 
                 match = re.search(r"^:([^!]+)!.* PRIVMSG ([^ ]+) :(.+)$", line)
                 if match:
@@ -193,16 +192,15 @@ class IRCBot:
                     message = match.group(3)
 
                     if target == self.nickname:
-                        print(f"Private message from {sender}: {message}")
+                        print(term.green(f"Private message from {sender}: {message}"))
                         self.handle_command(sender, message)
                     else:
-                        print(f"Message in {target} from {sender}: {message}")
+                        print(term.green(f"Message in {target} from {sender}: {message}"))
                         self.handle_command(target, message, sender)
 
         except Exception as e:
-            print(f"Error in process_data: {e}")
+            print(term.red(f"Error in process_data: {e}"))
             traceback.print_exc()
-
 
     def handle_command(self, target, message, sender=None):
         """Handles user commands."""
@@ -214,9 +212,9 @@ class IRCBot:
                 try:
                     self.command_handlers[command](self, target, sender, *args)
                 except TypeError as e:
-                    print(f"Error executing command {command}: {e}. Check function signature.")
+                    print(term.red(f"Error executing command {command}: {e}. Check function signature."))
                 except Exception as e:
-                    print(f"An error occurred while executing command {command}: {e}")
+                    print(term.red(f"An error occurred while executing command {command}: {e}"))
                     traceback.print_exc()
 
     def register_command(self, command, handler):
@@ -233,25 +231,25 @@ class IRCBot:
                 except queue.Empty:
                     continue
                 except Exception as e:
-                    print(f"Error processing message in {channel}: {e}")
+                    print(term.red(f"Error processing message in {channel}: {e}"))
                     traceback.print_exc()
         except Exception as e:
-            print(f"Error in channel worker for {channel}: {e}")
+            print(term.red(f"Error in channel worker for {channel}: {e}"))
             traceback.print_exc()
 
     def reconnect(self):
         """Reconnects with enhanced error handling."""
-        print("Reconnecting...")
+        print(term.green("Reconnecting..."))
         self.disconnect()
         if not self.connect():
-            print("Reconnection failed.")
+            print(term.red("Reconnection failed."))
             self.running = False
             return
 
     def run(self):
         """Main bot loop with robust error handling and reconnection."""
         if not self.connect():
-            print("Initial connection failed. Exiting.")
+            print(term.red("Initial connection failed. Exiting."))
             return
 
         channel_queues = {channel: queue.Queue() for channel in self.channels}
@@ -268,25 +266,25 @@ class IRCBot:
                 try:
                     raw_data = self.socket.recv(4096)
                     if not raw_data:
-                        print("Connection lost.")
+                        print(term.red("Connection lost."))
                         self.reconnect()
                         continue
 
                     for line in raw_data.split(b'\r\n'):
                         self.process_data(line)
                 except socket.timeout:
-                    print("Socket timed out while receiving data.")
+                    print(term.red("Socket timed out while receiving data."))
                     self.reconnect()
                 except socket.error as e:
-                    print(f"Socket error: {e}")
+                    print(term.red(f"Socket error: {e}"))
                     self.reconnect()
                 except Exception as e:
-                    print(f"An unexpected error occurred in main loop: {e}")
+                    print(term.red(f"An unexpected error occurred in main loop: {e}"))
                     traceback.print_exc()
                     self.running = False
                     break
         except KeyboardInterrupt:
-            print("Disconnecting...")
+            print(term.red("Disconnecting..."))
             self.running = False
         finally:
             for thread in channel_threads.values():
