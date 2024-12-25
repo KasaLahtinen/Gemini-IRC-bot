@@ -7,10 +7,13 @@ import re
 import threading
 import queue
 import traceback
+import mimetypes
 import chardet
 import validators
 from blessed import Terminal
 import yaml
+import requests
+from bs4 import BeautifulSoup
 
 
 term = Terminal()
@@ -168,11 +171,54 @@ class IRCBot:
         if reply_code in error_messages:
             print(term.red(f"{error_messages[reply_code]} {reply_text}"))
 
-    def _handle_url(self, url):
+    def _get_url_info(self, url):
+        """Fetches URL, determines file type, and extracts HTML metadata."""
+        try:
+            headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'}
+            response = requests.get(url, stream=True, timeout=5, headers=headers) #Set timeout to 5 seconds
+            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+
+            content_type = response.headers.get('Content-Type')
+            file_type, encoding = mimetypes.guess_type(url)
+            print(term.green(f"Content-Type: {content_type}"))
+            print(term.green(f"Guessed File Type: {file_type}"))
+
+            if content_type and "text/html" in content_type:
+                chunk_size = 1024
+                content = b""
+                for chunk in response.iter_content(chunk_size=chunk_size):
+                    content += chunk
+                    if len(content) > 1024 * 1024: #Limit to 1MB
+                        print(term.yellow("HTML content truncated (1MB limit reached)."))
+                        break
+                soup = BeautifulSoup(content, "html.parser")
+                title = soup.title.string.strip() if soup.title else None
+                description_meta = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
+                description = description_meta["content"].strip() if description_meta and description_meta.has_attr("content") else None
+                return file_type, title, description
+
+            return file_type, None, None
+
+        except requests.exceptions.RequestException as e:
+            print(term.red(f"Error fetching URL {url}: {e}"))
+            return None, None, None
+        except Exception as e:
+            print(term.red(f"An unexpected error occurred while processing url {url}: {e}"))
+            traceback.print_exc()
+            return None, None, None
+
+    def _handle_url(self, url, target=None): # Target now optional
         """Handles URL detection and validation."""
         print(term.green(f"Detected URL: {url}"))
         if validators.url(url):
             print(term.green(f"{url} is a valid URL"))
+            file_type, title, description = self._get_url_info(url)
+            if file_type:
+                print(term.green(f"File Type: {file_type}"))
+            if title and target: #Only send message if target is given
+                self.send_message(target, f"Title: {title}")
+            if description and target: #Only send message if target is given
+                self.send_message(target, f"Description: {description}")
         else:
             print(term.red(f"{url} is not a valid URL"))
 
@@ -200,31 +246,37 @@ class IRCBot:
                     self._handle_ping(line)
                     continue
 
-                match = re.search(r"^:([^!]+)!.* (JOIN) :(.+)$", line)
-                if match:
-                    nick = match.group(1)
-                    channel = match.group(3)
+                match_join = re.search(r"^:([^!]+)!.* (JOIN) :(.+)$", line)
+                if match_join:
+                    nick = match_join.group(1)
+                    channel = match_join.group(3)
                     self._handle_join(nick, channel)
                     continue
 
-                match = re.search(r"^:[^ ]+ ([0-9]{3}) .+ :(.+)$", line)
-                if match:
-                    reply_code = match.group(1)
-                    reply_text = match.group(2)
-                    self._handle_numeric_reply(reply_code, reply_text)
+                match_numeric = re.search(r"^:[^ ]+ ([0-9]{3}) .+ :(.+)$", line)
+                if match_numeric:
+                    #Numeric replies do not have targets for messages
                     continue
 
+                match_privmsg = re.search(r"^:([^!]+)!.* PRIVMSG ([^ ]+) :(.+)$", line)
+                if match_privmsg:
+                    sender = match_privmsg.group(1)
+                    target = match_privmsg.group(2)
+                    message = match_privmsg.group(3)
+
+                    url_match = re.findall(r"\b(https?:\/\/[^\s]+)", message) #Search urls in the message
+                    if url_match:
+                        for url in url_match:
+                            self._handle_url(url, target) #Now target is correctly passed
+
+                    self._handle_privmsg(sender, target, message) #Handle message after url processing
+                    continue
+
+                #If no match is found, check for urls in the complete line (for other message types)
                 url_match = re.findall(r"\b(https?:\/\/[^\s]+)", line)
                 if url_match:
                     for url in url_match:
-                        self._handle_url(url)
-
-                match = re.search(r"^:([^!]+)!.* PRIVMSG ([^ ]+) :(.+)$", line)
-                if match:
-                    sender = match.group(1)
-                    target = match.group(2)
-                    message = match.group(3)
-                    self._handle_privmsg(sender, target, message)
+                        self._handle_url(url) #No target given if not a PRIVMSG
 
         except (UnicodeDecodeError, IOError) as e:
             print(term.red(f"Error in process_data: {e}"))
@@ -355,7 +407,7 @@ def join_command(bot, target, sender, *args):
 
 if __name__ == "__main__":
     Bot = IRCBot()
-    Bot.register_command("!hello", hello_command)
-    Bot.register_command("!join", join_command)
+#    Bot.register_command("!hello", hello_command)
+#    Bot.register_command("!join", join_command)
     print(term.green("Starting bot .."))
     Bot.run()
