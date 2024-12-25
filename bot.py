@@ -26,10 +26,6 @@ class IRCBot:
     def connect(self):
         """Connects to the IRC server with enhanced error handling."""
         try:
-#            if self.use_ssl:
-#                raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#                self.socket = ssl.wrap_socket(raw_socket)
-#            else:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
             self.socket.settimeout(10)  # Set a timeout for the connect operation
@@ -71,7 +67,7 @@ class IRCBot:
         except socket.error as e:
             print(term.red(f"Error sending message: {e}"))
             self.reconnect()
-        except Exception as e:
+        except (UnicodeEncodeError, IOError) as e:
             print(term.red(f"An unexpected error occurred while sending: {e}"))
             traceback.print_exc()
 
@@ -79,14 +75,14 @@ class IRCBot:
         """Joins a channel with error handling."""
         try:
             self.send_raw(f"JOIN {channel}\r\n")
-        except Exception as e:
+        except socket.error as e:
             print(term.red(f"Error joining channel {channel}: {e}"))
 
     def send_message(self, target, message):
         """Sends a message with error handling."""
         try:
             self.send_raw(f"PRIVMSG {target} :{message}\r\n")
-        except Exception as e:
+        except (UnicodeEncodeError, IOError) as e:
             print(term.red(f"Error sending message to {target}: {e}"))
 
     def process_data(self, raw_data):
@@ -103,7 +99,7 @@ class IRCBot:
                 else:
                     data = raw_data.decode('latin-1', errors='replace')
                     print(term.green("Fallback to latin-1"))
-            except Exception as e:
+            except (UnicodeDecodeError, IOError) as e:
                 print(term.red(f"Error decoding data: {e}"))
                 traceback.print_exc()
                 data = raw_data.decode('latin-1', errors='replace')
@@ -167,7 +163,7 @@ class IRCBot:
                         print(term.green(f"Message in {target} from {sender}: {message}"))
                         self.handle_command(target, message, sender)
 
-        except Exception as e:
+        except (UnicodeDecodeError, IOError) as e:
             print(term.red(f"Error in process_data: {e}"))
             traceback.print_exc()
 
@@ -182,7 +178,7 @@ class IRCBot:
                     self.command_handlers[command](self, target, sender, *args)
                 except TypeError as e:
                     print(term.red(f"Error executing command {command}: {e}. Check function signature."))
-                except Exception as e:
+                except (ValueError, IOError) as e:
                     print(term.red(f"An error occurred while executing command {command}: {e}"))
                     traceback.print_exc()
 
@@ -199,10 +195,10 @@ class IRCBot:
                     self.process_data(message)
                 except queue.Empty:
                     continue
-                except Exception as e:
+                except (UnicodeDecodeError, IOError) as e:
                     print(term.red(f"Error processing message in {channel}: {e}"))
                     traceback.print_exc()
-        except Exception as e:
+        except (UnicodeDecodeError, IOError) as e:
             print(term.red(f"Error in channel worker for {channel}: {e}"))
             traceback.print_exc()
 
@@ -247,7 +243,7 @@ class IRCBot:
                 except socket.error as e:
                     print(term.red(f"Socket error: {e}"))
                     self.reconnect()
-                except Exception as e:
+                except (UnicodeDecodeError, IOError) as e:
                     print(term.red(f"An unexpected error occurred in main loop: {e}"))
                     traceback.print_exc()
                     self.running = False
