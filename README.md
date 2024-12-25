@@ -1,66 +1,68 @@
-## MyPythonBot: An IRC Bot built with Generative AI Assistance
+# Python IRC Bot
 
-This Python code implements a functional IRC bot named MyPythonBot. While the core functionalities were written and designed by humans, the development process was assisted by generative AI models, including:
+This is a Python script for a basic IRC bot that can connect to an IRC server, join channels, and respond to commands.
 
-* **Gemini**: Provided a base structure and core functionalities for the bot.
-* **ChatGPT**: Offered suggestions for improvements and potential use cases.
-* **Copilot**: Helped with code completion and boilerplate reduction.
+**## AI-Assisted Development**
 
-**Features**
+This project was developed with significant assistance from generative AI models, minimizing the amount of human-written code. The following models contributed to various aspects of the project:
 
-* Connects to IRC servers (both secure and non-secure)
-* Decodes incoming data and handles encoding errors
-* Parses various IRC messages (PING, JOIN, PRIVMSG, numeric replies)
-* Detects and validates URLs
-* Supports custom command registration and handling
-* Implements robust error handling and reconnection logic
+*   **Google Gemini:** Provided initial code structure, core IRC functionality, and error handling patterns.
+*   **ChatGPT:** Offered suggestions for improvements to code clarity, feature additions, and README generation.
+*   **GitHub Copilot:** Assisted with code completion, reducing boilerplate, and suggesting common coding patterns.
 
-**Getting Started**
+While these tools played a key role in the rapid prototyping and development of this bot, the overall design, integration, and final refinement were overseen and validated by human developers.
 
-1. **Install dependencies:**
+**## Features**
 
-   ```bash
-   pip install blessed chardet validators queue
-   ```
+*   Connects to an IRC server using a YAML configuration file.
+*   Handles various IRC messages including PING, JOIN, PRIVMSG, and numeric replies.
+*   Supports user-defined commands with basic error handling.
+*   Detects and validates URLs in chat messages.
+*   Uses `blessed` library for colored terminal output.
+*   Handles disconnections and attempts to reconnect automatically.
 
-2. **Configuration:**
+**## Requirements**
 
-   Edit the `config` dictionary in `bot.py` to set your desired IRC server details:
+*   Python 3.x
+*   Standard Python Libraries: `socket`, `ssl`, `re`, `threading`, `queue`, `traceback`
+*   External Libraries:
+    *   `chardet`: `pip install chardet`
+    *   `validators`: `pip install validators`
+    *   `blessed`: `pip install blessed`
+    *   `pyyaml`: `pip install pyyaml`
 
-   ```python
-   config = {
-       "server": "your_irc_server",
-       "port": 6667,
-       "password": None,  # Optional password
-       "use_ssl": False,  # Set to True for secure connection
-   }
-   ```
+**## Usage**
 
-3. **Run the bot:**
+1.  Create a configuration file named `config.yaml` in the same directory as your bot script (`bot.py`).
+2.  Edit `config.yaml` with your desired settings:
 
-   ```bash
-   python bot.py
-   ```
+    ```yaml
+    bot:
+      nickname: your_bot_nickname
+      channels:
+        - "#channel1"
+        - "#channel2"
+    connection:
+      use_ssl: true  # Set to false to disable SSL
+      server: irc.example.com
+      port: 6697
+      password: your_password  # Optional password for the server
+    # thread_pool_size: 4  # Optional thread pool size for channel workers (default 4)
+    ```
 
-**Available Commands**
+3.  Run the bot script using:
 
-* `!hello`: Greets the user or channel.
-* `!join #channel`: Makes the bot join a specified channel. 
+    ```bash
+    python bot.py
+    ```
 
-**Additional Notes**
+**## Registering Commands**
 
-* This is a basic example and can be extended to include more functionalities.
-* Consider using a proper logging library for production use.
-* The `blessed` library is used for colored terminal output (optional).
+You can register custom commands for your bot by using the `register_command` function:
 
-**Contributing**
+```python
+def my_command(bot, target, sender, *args):
+  # Your command logic here
+  pass
 
-We welcome contributions to improve this bot! Feel free to fork the repository and submit pull requests with enhancements or bug fixes.
-
-**License**
-
-This code is provided under the MIT License. See the LICENSE file for details.
-
-**Disclaimer**
-
-This project is for educational and demonstrative purposes only. Please use responsibly and adhere to the terms of service of the IRC servers you connect to.
+Bot.register_command("!mycommand", my_command)
