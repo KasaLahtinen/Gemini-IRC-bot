@@ -144,7 +144,7 @@ class IRCBot:
                 line = line.strip()
                 if not line:
                     continue
-                print(term.green(f"Received: {line}"))
+                print(f"Received: {line}")
 
                 if line.startswith("PING"):
                     self.send_raw(f"PONG {line.split()[1]}\r\n")
