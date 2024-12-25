@@ -16,14 +16,11 @@ term = Terminal()
 class IRCBot:
     """IRC Bot class"""
 
-    def __init__(self, server, port, nickname, channels, use_ssl=False, password=None):
+    def __init__(self, connection_params, nickname, channels):
         """Initializes the IRC bot."""
-        self.server = server
-        self.port = port
+        self.connection_params = connection_params
         self.nickname = nickname
         self.channels = channels
-        self.use_ssl = use_ssl
-        self.password = password
         self.socket = None
         self.running = True
         self.command_handlers = {}
@@ -32,23 +29,25 @@ class IRCBot:
     def connect(self):
         """Connects to the IRC server with enhanced error handling."""
         try:
-            if self.use_ssl:
+            if self.connection_params["use_ssl"]:
                 context = ssl.create_default_context()
                 context.verify_mode = ssl.CERT_REQUIRED
                 context.check_hostname = True
                 context.load_default_certs()
 
                 raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.socket = context.wrap_socket(raw_socket, server_hostname=self.server)
+                self.socket = context.wrap_socket(
+                    raw_socket, server_hostname=self.connection_params["server"]
+                )
             else:
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
             self.socket.settimeout(10)  # Set a timeout for the connect operation
-            self.socket.connect((self.server, self.port))
+            self.socket.connect((self.connection_params["server"], self.connection_params["port"]))
             self.socket.settimeout(None)  # Remove timeout after successful connection
 
-            if self.password:
-                self.send_raw(f"PASS {self.password}\r\n")
+            if self.connection_params["password"]:
+                self.send_raw(f"PASS {self.connection_params['password']}\r\n")
             self.send_raw(f"NICK {self.nickname}\r\n")
             self.send_raw(f"USER {self.nickname} 0 * :{self.nickname}\r\n")
 
@@ -56,13 +55,13 @@ class IRCBot:
                 self.join_channel(channel)
 
         except ssl.SSLError as e:
-            print(term.red(f"SSL error connecting to {self.server}:{self.port}: {e}"))
+            print(term.red(f"SSL error connecting to {self.connection_params["server"]}:{self.connection_params["port"]}: {e}"))
             return False
         except socket.timeout:
-            print(term.red(f"Connection to {self.server}:{self.port} timed out."))
+            print(term.red(f"Connection to {self.connection_params["server"]}:{self.connection_params["port"]} timed out."))
             return False
         except socket.error as e:
-            print(term.red(f"Error connecting to {self.server}:{self.port}: {e}"))
+            print(term.red(f"Error connecting to {self.connection_params["server"]}:{self.connection_params["port"]}: {e}"))
             return False
         return True
 
@@ -332,15 +331,25 @@ def join_command(bot, target, sender, *args):
         bot.send_message(target, "Usage: !join #channel")
 
 
+#if __name__ == "__main__":
+#    SERVER = "10.0.3.11"  # Example server
+#    PORT = 6667  # Example SSL port, use 6667 for non-SSL
+#    NICKNAME = "MyPythonBot"  # Change this
+#    CHANNELS = ["#hades"]  # Change this
+#    PASSWORD = None  # Set if the server requires a password
+#    USE_SSL = False
 if __name__ == "__main__":
-    SERVER = "10.0.3.11"  # Example server
-    PORT = 6667  # Example SSL port, use 6667 for non-SSL
-    NICKNAME = "MyPythonBot"  # Change this
-    CHANNELS = ["#hades"]  # Change this
-    PASSWORD = None  # Set if the server requires a password
-    USE_SSL = False
+    config = {
+        "server": "10.0.3.11",
+        "port": 6667,
+        "password": None,
+        "use_ssl": False,
+    }
+    NICKNAME = "MyPythonBot"
+    CHANNELS = ["#hades"]
 
-    Bot = IRCBot(SERVER, PORT, NICKNAME, CHANNELS, USE_SSL, PASSWORD)
+    Bot = IRCBot(config, NICKNAME, CHANNELS)
+#    Bot = IRCBot(SERVER, PORT, NICKNAME, CHANNELS, USE_SSL, PASSWORD)
     Bot.register_command("!hello", hello_command)
     Bot.register_command("!join", join_command)
     print(term.green("Starting bot .."))
