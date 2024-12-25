@@ -55,13 +55,17 @@ class IRCBot:
                 self.join_channel(channel)
 
         except ssl.SSLError as e:
-            print(term.red(f"SSL error connecting to {self.connection_params["server"]}:{self.connection_params["port"]}: {e}"))
+            print(term.red(f"SSL error connecting to "
+                           f"{self.connection_params['server']}:"
+                           f"{self.connection_params['port']}: {e}"))
             return False
         except socket.timeout:
-            print(term.red(f"Connection to {self.connection_params["server"]}:{self.connection_params["port"]} timed out."))
+            print(term.red(f"Connection to {self.connection_params['server']}:"
+                           f"{self.connection_params['port']} timed out."))
             return False
         except socket.error as e:
-            print(term.red(f"Error connecting to {self.connection_params["server"]}:{self.connection_params["port"]}: {e}"))
+            print(term.red(f"Error connecting to {self.connection_params['server']}:"
+                           f"{self.connection_params['port']}: {e}"))
             return False
         return True
 
@@ -113,10 +117,9 @@ class IRCBot:
                 decoded_data = raw_data.decode(encoding)
                 print(term.green(f"Detected encoding: {encoding}"))
                 return decoded_data
-            else:
-                decoded_data = raw_data.decode("latin-1", errors="replace")
-                print(term.green("Fallback to latin-1"))
-                return decoded_data
+            decoded_data = raw_data.decode("latin-1", errors="replace")
+            print(term.green("Fallback to latin-1"))
+            return decoded_data
         except IOError as e:
             print(term.red(f"Error decoding data: {e}"))
             traceback.print_exc()
@@ -331,13 +334,6 @@ def join_command(bot, target, sender, *args):
         bot.send_message(target, "Usage: !join #channel")
 
 
-#if __name__ == "__main__":
-#    SERVER = "10.0.3.11"  # Example server
-#    PORT = 6667  # Example SSL port, use 6667 for non-SSL
-#    NICKNAME = "MyPythonBot"  # Change this
-#    CHANNELS = ["#hades"]  # Change this
-#    PASSWORD = None  # Set if the server requires a password
-#    USE_SSL = False
 if __name__ == "__main__":
     config = {
         "server": "10.0.3.11",
@@ -349,7 +345,6 @@ if __name__ == "__main__":
     CHANNELS = ["#hades"]
 
     Bot = IRCBot(config, NICKNAME, CHANNELS)
-#    Bot = IRCBot(SERVER, PORT, NICKNAME, CHANNELS, USE_SSL, PASSWORD)
     Bot.register_command("!hello", hello_command)
     Bot.register_command("!join", join_command)
     print(term.green("Starting bot .."))
