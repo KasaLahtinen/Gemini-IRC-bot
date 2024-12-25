@@ -9,6 +9,8 @@ import traceback
 import chardet
 import validators
 from blessed import Terminal
+import yaml
+#import os
 
 term = Terminal()
 
@@ -16,20 +18,33 @@ term = Terminal()
 class IRCBot:
     """IRC Bot class"""
 
-    def __init__(self, connection_params, nickname, channels):
-        """Initializes the IRC bot."""
-        self.connection_params = connection_params
-        self.nickname = nickname
-        self.channels = channels
+    def _load_config(self):
+        """Loads the configuration from the YAML file."""
+        try:
+            with open(self.config_file, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f)  # Use yaml.safe_load()
+        except FileNotFoundError:
+            print(term.red(f"Error: Configuration file '{self.config_file}' not found."))
+            exit(1)
+        except yaml.YAMLError as e: #Catch yaml errors
+            print(term.red(f"Error: Invalid YAML in configuration file: {e}"))
+            exit(1)
+
+    def __init__(self, config_file="config.yaml"): #Set default to yaml
+        """Initializes the IRC bot from a configuration file."""
+        self.config_file = config_file
+        self.config = self._load_config()
         self.socket = None
         self.running = True
         self.command_handlers = {}
-
+        self.nickname = self.config["bot"]["nickname"]
+        self.channels = self.config["bot"]["channels"]
+        self.thread_pool_size = self.config.get("thread_pool_size", 4) #Get thread_pool_size with a default value
 
     def connect(self):
         """Connects to the IRC server with enhanced error handling."""
         try:
-            if self.connection_params["use_ssl"]:
+            if self.config["connection"]["use_ssl"]:
                 context = ssl.create_default_context()
                 context.verify_mode = ssl.CERT_REQUIRED
                 context.check_hostname = True
@@ -37,17 +52,17 @@ class IRCBot:
 
                 raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.socket = context.wrap_socket(
-                    raw_socket, server_hostname=self.connection_params["server"]
+                    raw_socket, server_hostname=self.config["connection"]["server"]
                 )
             else:
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
             self.socket.settimeout(10)  # Set a timeout for the connect operation
-            self.socket.connect((self.connection_params["server"], self.connection_params["port"]))
+            self.socket.connect((self.config["connection"]["server"], self.config["connection"]["port"]))
             self.socket.settimeout(None)  # Remove timeout after successful connection
 
-            if self.connection_params["password"]:
-                self.send_raw(f"PASS {self.connection_params['password']}\r\n")
+            if self.config["connection"]["password"]:
+                self.send_raw(f"PASS {self.config["connection"]['password']}\r\n")
             self.send_raw(f"NICK {self.nickname}\r\n")
             self.send_raw(f"USER {self.nickname} 0 * :{self.nickname}\r\n")
 
@@ -56,16 +71,16 @@ class IRCBot:
 
         except ssl.SSLError as e:
             print(term.red(f"SSL error connecting to "
-                           f"{self.connection_params['server']}:"
-                           f"{self.connection_params['port']}: {e}"))
+                           f"{self.config["connection"]['server']}:"
+                           f"{self.config["connection"]['port']}: {e}"))
             return False
         except socket.timeout:
-            print(term.red(f"Connection to {self.connection_params['server']}:"
-                           f"{self.connection_params['port']} timed out."))
+            print(term.red(f"Connection to {self.config["connection"]['server']}:"
+                           f"{self.config["connection"]['port']} timed out."))
             return False
         except socket.error as e:
-            print(term.red(f"Error connecting to {self.connection_params['server']}:"
-                           f"{self.connection_params['port']}: {e}"))
+            print(term.red(f"Error connecting to {self.config["connection"]['server']}:"
+                           f"{self.config["connection"]['port']}: {e}"))
             return False
         return True
 
@@ -335,16 +350,7 @@ def join_command(bot, target, sender, *args):
 
 
 if __name__ == "__main__":
-    config = {
-        "server": "10.0.3.11",
-        "port": 6667,
-        "password": None,
-        "use_ssl": False,
-    }
-    NICKNAME = "MyPythonBot"
-    CHANNELS = ["#hades"]
-
-    Bot = IRCBot(config, NICKNAME, CHANNELS)
+    Bot = IRCBot()
     Bot.register_command("!hello", hello_command)
     Bot.register_command("!join", join_command)
     print(term.green("Starting bot .."))

@@ -1,0 +1,10 @@
+connection:
+  server: "irc.example.net"
+  port: 6667
+  use_ssl: false
+  password: "your_password"
+bot:
+  nickname: "MyYamlBot"
+  channels: ["#channel1", "#channel2"]
+  command_prefix: "!"
+thread_pool_size: 4
