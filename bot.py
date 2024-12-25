@@ -174,12 +174,24 @@ class IRCBot:
     def _get_url_info(self, url):
         """Fetches URL, determines file type, and extracts HTML metadata."""
         try:
-            headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'}
-            response = requests.get(url, stream=True, timeout=5, headers=headers) #Set timeout to 5 seconds
+            headers = {
+                'User-Agent': (
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    'Chrome/119.0.0.0 Safari/537.36'
+                )
+            }
+            response = requests.get(
+                url,
+                stream=True,
+                timeout=5,
+                headers=headers
+            )
             response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
 
             content_type = response.headers.get('Content-Type')
             file_type, encoding = mimetypes.guess_type(url)
+            print(term.green(f"Encoding: {encoding}"))
             print(term.green(f"Content-Type: {content_type}"))
             print(term.green(f"Guessed File Type: {file_type}"))
 
@@ -193,8 +205,13 @@ class IRCBot:
                         break
                 soup = BeautifulSoup(content, "html.parser")
                 title = soup.title.string.strip() if soup.title else None
-                description_meta = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
-                description = description_meta["content"].strip() if description_meta and description_meta.has_attr("content") else None
+                description_meta = soup.find("meta", attrs={"name": "description"})
+                if not description_meta:
+                    description_meta = soup.find("meta", attrs={"property": "og:description"})
+                if description_meta and description_meta.has_attr("content"):
+                    description = description_meta["content"].strip()
+                else:
+                    description = None
                 return file_type, title, description
 
             return file_type, None, None
@@ -202,10 +219,10 @@ class IRCBot:
         except requests.exceptions.RequestException as e:
             print(term.red(f"Error fetching URL {url}: {e}"))
             return None, None, None
-        except Exception as e:
-            print(term.red(f"An unexpected error occurred while processing url {url}: {e}"))
-            traceback.print_exc()
-            return None, None, None
+        #except Exception as e:
+        #    print(term.red(f"An unexpected error occurred while processing url {url}: {e}"))
+        traceback.print_exc()
+        return None, None, None
 
     def _handle_url(self, url, target=None): # Target now optional
         """Handles URL detection and validation."""
@@ -222,14 +239,32 @@ class IRCBot:
         else:
             print(term.red(f"{url} is not a valid URL"))
 
-    def _handle_privmsg(self, sender, target, message):
-        """Handles PRIVMSG (chat messages)."""
-        if target == self.nickname:
-            print(term.green(f"Private message from {sender}: {message}"))
-            self.handle_command(sender, message)
-        else:
-            print(term.green(f"Message in {target} from {sender}: {message}"))
-            self.handle_command(target, message, sender)
+    def _is_ping(self, line):
+        return line.startswith("PING")
+
+    def _find_join_match(self, line):
+        return re.search(r"^:([^!]+)!.* JOIN :(.+)$", line)
+
+    def _find_numeric_match(self, line):
+        return re.search(r"^:[^ ]+ ([0-9]{3}) .+ :(.+)$", line)
+
+    def _find_privmsg_match(self, line):
+        return re.search(r"^:([^!]+)!.* PRIVMSG ([^ ]+) :(.+)$", line)
+
+    def _handle_privmsg(self, match_privmsg):
+        sender, target, message = match_privmsg.groups()
+
+        url_regex = r"\b(https?:\/\/[^\s]+)"
+        url_match = re.findall(url_regex, message)
+        if url_match:
+            for url in url_match:
+                self._handle_url(url, target)
+
+        self._handle_privmsg_content(sender, target, message) #Handle the message content
+
+    def _handle_privmsg_content(self, sender, target, message):
+        """Handles the actual content of a PRIVMSG (commands, etc.)."""
+        self.handle_command(target, message, sender)
 
     def process_data(self, raw_data):
         """Processes incoming raw data."""
@@ -242,46 +277,34 @@ class IRCBot:
                     continue
                 print(f"Received: {line}")
 
-                if line.startswith("PING"):
+                if self._is_ping(line):
                     self._handle_ping(line)
                     continue
 
-                match_join = re.search(r"^:([^!]+)!.* (JOIN) :(.+)$", line)
-                if match_join:
-                    nick = match_join.group(1)
-                    channel = match_join.group(3)
+                if match_join := self._find_join_match(line):
+                    nick, channel = match_join.groups()
                     self._handle_join(nick, channel)
                     continue
 
-                match_numeric = re.search(r"^:[^ ]+ ([0-9]{3}) .+ :(.+)$", line)
-                if match_numeric:
-                    #Numeric replies do not have targets for messages
+                if match_numeric := self._find_numeric_match(line):
+                    self._handle_numeric_reply(match_numeric.group(1), match_numeric.group(2))
                     continue
 
-                match_privmsg = re.search(r"^:([^!]+)!.* PRIVMSG ([^ ]+) :(.+)$", line)
-                if match_privmsg:
-                    sender = match_privmsg.group(1)
-                    target = match_privmsg.group(2)
-                    message = match_privmsg.group(3)
-
-                    url_match = re.findall(r"\b(https?:\/\/[^\s]+)", message) #Search urls in the message
-                    if url_match:
-                        for url in url_match:
-                            self._handle_url(url, target) #Now target is correctly passed
-
-                    self._handle_privmsg(sender, target, message) #Handle message after url processing
+                if match_privmsg := self._find_privmsg_match(line):
+                    self._handle_privmsg(match_privmsg)
                     continue
 
-                #If no match is found, check for urls in the complete line (for other message types)
+                # Handle other message types or URL detection in other messages
                 url_match = re.findall(r"\b(https?:\/\/[^\s]+)", line)
                 if url_match:
                     for url in url_match:
-                        self._handle_url(url) #No target given if not a PRIVMSG
+                        self._handle_url(url)
 
         except (UnicodeDecodeError, IOError) as e:
             print(term.red(f"Error in process_data: {e}"))
             traceback.print_exc()
 
+    # ... (rest of the IRCBot class and other functions)
     def handle_command(self, target, message, sender=None):
         """Handles user commands."""
         parts = message.split()
