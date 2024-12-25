@@ -26,11 +26,11 @@ class IRCBot:
     def connect(self):
         """Connects to the IRC server with enhanced error handling."""
         try:
-            if self.use_ssl:
-                raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.socket = ssl.wrap_socket(raw_socket)
-            else:
-                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#            if self.use_ssl:
+#                raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#                self.socket = ssl.wrap_socket(raw_socket)
+#            else:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
             self.socket.settimeout(10)  # Set a timeout for the connect operation
             self.socket.connect((self.server, self.port))
@@ -81,37 +81,6 @@ class IRCBot:
             self.send_raw(f"JOIN {channel}\r\n")
         except Exception as e:
             print(term.red(f"Error joining channel {channel}: {e}"))
-
-    def send_message(self, target, message):
-        """Sends a message with error handling."""
-        try:
-            self.send_raw(f"PRIVMSG {target} :{message}\r\n")
-        except Exception as e:
-            print(term.red(f"Error sending message to {target}: {e}"))
-
-    def send_raw(self, message):
-        """Sends a raw message with error handling."""
-        try:
-            if self.socket:
-                self.socket.send(message.encode('utf-8'))
-            else:
-                print(term.red("Socket is not connected. Cannot send message."))
-        except socket.error as e:
-            print(term.red(f"Error sending message: {e}"))
-            self.reconnect()
-        except Exception as e:
-            print(term.red(f"An unexpected error occurred while sending: {e}"))
-            traceback.print_exc()
-
-    def join_channel(self, channel):
-        """Joins a specific channel."""
-        try:
-            self.send_raw(f"JOIN {channel}\r\n")
-            return True # Assume the join command was sent successfully
-        except Exception as e:
-            print(term.red(f"Error sending JOIN command for {channel}: {e}"))
-            traceback.print_exc()
-            return False
 
     def send_message(self, target, message):
         """Sends a message with error handling."""
@@ -316,15 +285,15 @@ def join_command(bot, target, sender, *args):
         bot.send_message(target, "Usage: !join #channel")
 
 if __name__ == "__main__":
-    server = "10.0.3.11"  # Example server
-    port = 6667  # Example SSL port, use 6667 for non-SSL
-    nickname = "MyPythonBot"  # Change this
-    channels = ["#hades"]  # Change this
-    password = None  # Set if the server requires a password
-    use_ssl = False
+    SERVER = "10.0.3.11"  # Example server
+    PORT = 6667  # Example SSL port, use 6667 for non-SSL
+    NICKNAME = "MyPythonBot"  # Change this
+    CHANNELS = ["#hades"]  # Change this
+    PASSWORD = None  # Set if the server requires a password
+    USE_SSL = False
 
-    bot = IRCBot(server, port, nickname, channels, use_ssl, password)
-    bot.register_command("!hello", hello_command)
-    bot.register_command("!join", join_command)
+    Bot = IRCBot(SERVER, PORT, NICKNAME, CHANNELS, USE_SSL, PASSWORD)
+    Bot.register_command("!hello", hello_command)
+    Bot.register_command("!join", join_command)
     print(term.green("Starting bot .."))
-    bot.run()
+    Bot.run()
