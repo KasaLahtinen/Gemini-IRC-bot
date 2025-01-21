@@ -3,7 +3,7 @@
 
 import sys
 import socket
-import ssl
+#import ssl
 import re
 import threading
 import queue
