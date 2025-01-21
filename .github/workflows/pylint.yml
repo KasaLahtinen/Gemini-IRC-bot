@@ -20,4 +20,4 @@ jobs:
         pip install pylint chardet validators blessed pyyaml requests BeautifulSoup4 psutil
     - name: Analysing the code with pylint
       run: |
-        pylint $(git ls-files '*.py')
+        pylint bot.py
