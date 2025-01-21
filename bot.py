@@ -9,10 +9,10 @@ import queue
 import traceback
 import mimetypes
 import time
+from collections import deque
 import psutil
 import chardet
 import validators
-from collections import deque
 from blessed import Terminal
 import yaml
 import requests
@@ -26,22 +26,22 @@ class IRCBot:
     """IRC Bot class"""
 
 
-    def _load_config(self):
+    def _load_config(self, config_file):
         """Loads the configuration from the YAML file."""
         try:
-            with open(self.config_file, "r", encoding="utf-8") as f:
+            with open(config_file, "r", encoding="utf-8") as f:
                 return yaml.safe_load(f)  # Use yaml.safe_load()
         except FileNotFoundError:
-            print(term.red(f"Error: Configuration file '{self.config_file}' not found."))
+            print(term.red(f"Error: Configuration file '{config_file}' not found."))
             sys.exit(1)
         except yaml.YAMLError as e: #Catch yaml errors
             print(term.red(f"Error: Invalid YAML in configuration file: {e}"))
             sys.exit(1)
 
-    def __init__(self, config_file="config.yaml"): #Set default to yaml
+    def __init__(self): #Set default to yaml
         """Initializes the IRC bot from a configuration file."""
-        self.config_file = config_file
-        self.config = self._load_config()
+#        self.config_file = config_file
+        self.config = self._load_config("config.yaml")
         self.socket = None
         self.running = True
         self.command_handlers = {}
@@ -172,7 +172,7 @@ class IRCBot:
                 self.channels.append(channel)
             print(term.green(f"Bot successfully joined {channel}"))
 
-    def _handle_ping_stats(self, line, start_time, processing_time):
+    def _handle_ping_stats(self, processing_time):
         """Handles PING messages and updates statistics."""
         self.ping_stats["count"] += 1
         self.ping_stats["total_time"] += processing_time
@@ -307,9 +307,9 @@ class IRCBot:
                     processing_time = time.time()
                     self._handle_ping(line)
                     processing_time = time.time() - start_time
-                    self._handle_ping_stats(line, start_time, processing_time)
+                    self._handle_ping_stats(processing_time)
                     start_time = time.time()
-                    continue 
+                    continue
 
                 if match_join := self._find_join_match(line):
                     nick, channel = match_join.groups()
@@ -330,7 +330,7 @@ class IRCBot:
                     for url in url_match:
                         self._handle_url(url)
 
-        except (UnicodeDecodeError, IOError, Exception) as e:
+        except (UnicodeDecodeError, IOError) as e:
             print(term.red(f"Error in process_data: {e}"))
             traceback.print_exc()
         finally:

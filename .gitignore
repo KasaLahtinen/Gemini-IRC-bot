@@ -1,2 +1,4 @@
 .vscode/settings.json
 .idx/dev.nix
+__pycache__
+.vscode
