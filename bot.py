@@ -184,11 +184,6 @@ class IRCBot:
             self.ping_stats["count"] = 0
             self.ping_stats["total_time"] = 0.0
             self.ping_stats["times"].clear()
-        """Handles JOIN messages."""
-        if nick == self.nickname:
-            if channel not in self.channels:
-                self.channels.append(channel)
-            print(term.green(f"Bot successfully joined {channel}"))
 
     def _handle_numeric_reply(self, reply_code, reply_text):
         """Handles numeric replies (error codes)."""
@@ -309,9 +304,10 @@ class IRCBot:
                 print(f"Received: {line}")
 
                 if self._is_ping(line):
+                    start_time = time.time()
+                    self._handle_ping(line)
                     processing_time = time.time() - start_time
                     self._handle_ping_stats(line, start_time, processing_time)
-                    start_time = time.time()
 
                 if match_join := self._find_join_match(line):
                     nick, channel = match_join.groups()
