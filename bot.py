@@ -1,3 +1,4 @@
+# bot.py
 """This module contains the IRCBot class and its related functions."""
 
 import sys
@@ -17,12 +18,12 @@ from blessed import Terminal
 import yaml
 import requests
 from bs4 import BeautifulSoup
+from connection import Connection
 from commands import (
     Command,
     CommandManager,
     hello_command,
 )  # Import the command classes
-
 
 term = Terminal()
 
@@ -46,7 +47,14 @@ class IRCBot:
         """Initializes the IRC bot from a configuration file."""
         #        self.config_file = config_file
         self.config = self._load_config("config.yaml")
-        self.socket = None
+        use_ssl = self.config.get("use_ssl", False)
+        self.connection = Connection(
+            self.config["connection"]["server"],
+            self.config["connection"]["port"],
+            self.config["bot"]["nickname"],
+            use_ssl=use_ssl,
+        )
+        #        self.socket = None
         self.running = True
         #        self.command_handlers = {}
         self.nickname = self.config["bot"]["nickname"]
@@ -78,84 +86,19 @@ class IRCBot:
             time.sleep(interval)
 
     def connect(self):
-        """Connects to the IRC server with enhanced error handling."""
-        try:
-            if self.config["connection"]["use_ssl"]:
-                context = ssl.create_default_context()
-                context.verify_mode = ssl.CERT_REQUIRED
-                context.check_hostname = True
-                context.load_default_certs()
-
-                raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.socket = context.wrap_socket(
-                    raw_socket, server_hostname=self.config["connection"]["server"]
-                )
-            else:
-                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-            self.socket.settimeout(10)  # Set a timeout for the connect operation
-            self.socket.connect(
-                (self.config["connection"]["server"], self.config["connection"]["port"])
-            )
-            self.socket.settimeout(None)  # Remove timeout after successful connection
-
-            if self.config["connection"]["password"]:
-                self.send_raw(f"PASS {self.config['connection']['password']}\r\n")
-            self.send_raw(f"NICK {self.nickname}\r\n")
-            self.send_raw(f"USER {self.nickname} 0 * :{self.nickname}\r\n")
-
-            for channel in self.channels:
-                self.join_channel(channel)
-
-        except ssl.SSLError as e:
-            print(
-                term.red(
-                    f"SSL error connecting to "
-                    f"{self.config['connection']['server']}:"
-                    f"{self.config['connection']['port']}: {e}"
-                )
-            )
-            return False
-        except socket.timeout:
-            print(
-                term.red(
-                    f"Connection to {self.config['connection']['server']}:"
-                    f"{self.config['connection']['port']} timed out."
-                )
-            )
-            return False
-        except socket.error as e:
-            print(
-                term.red(
-                    f"Error connecting to {self.config['connection']['server']}:"
-                    f"{self.config['connection']['port']}: {e}"
-                )
-            )
-            return False
-        return True
+        """Connects to the IRC server."""
+        self.connection.connect()
+        for channel in self.channels:
+            self.join_channel(channel)
+        return self.connection.sock
 
     def disconnect(self):
-        """Disconnects from the IRC server with error handling."""
-        try:
-            if self.socket:
-                self.send_raw("QUIT :Goodbye\r\n")
-                self.socket.close()
-        except socket.error as e:
-            print(term.red(f"Error during disconnection: {e}"))
+        """Disconnects from the IRC server."""
+        self.connection.disconnect()
 
-    def send_raw(self, message):
-        """Sends a raw message with error handling."""
-        try:
-            if self.socket:
-                self.socket.send(message.encode("utf-8"))
-            else:
-                print(term.red("Socket is not connected. Cannot send message."))
-        except socket.error as e:
-            print(term.red(f"Error sending message: {e}"))
-            self.reconnect()
-        except UnicodeEncodeError as e:
-            print(term.red(f"An unexpected error occurred while sending: {e}"))
-            traceback.print_exc()
+    def send_raw(self, data):
+        """Sends raw data to the IRC server."""
+        self.connection.send_raw(data)
 
     def join_channel(self, channel):
         """Joins a channel with error handling."""
@@ -300,6 +243,7 @@ class IRCBot:
 
     def _is_ping(self, line):
         return line.startswith("PING")
+
     def _is_pong(self, line):
         return line.startswith("PONG")
 
@@ -425,7 +369,7 @@ class IRCBot:
         try:
             while self.running:
                 try:
-                    raw_data = self.socket.recv(4096)
+                    raw_data = self.connection.recv_data()
                     if not raw_data:
                         print(term.red("Connection lost."))
                         self.reconnect()
@@ -451,6 +395,7 @@ class IRCBot:
             for thread in channel_threads.values():
                 thread.join(timeout=2)
             self.disconnect()
+
 
 def log_resource_usage():
     """Log resource usage"""
