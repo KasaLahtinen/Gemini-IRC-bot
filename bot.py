@@ -12,6 +12,7 @@ import time
 import psutil
 import chardet
 import validators
+from collections import deque
 from blessed import Terminal
 import yaml
 import requests
@@ -46,6 +47,8 @@ class IRCBot:
         self.command_handlers = {}
         self.nickname = self.config["bot"]["nickname"]
         self.channels = self.config["bot"]["channels"]
+        self.ping_stats = {"count": 0, "total_time": 0.0, "times": deque()}
+
         # Get thread_pool_size with a default value
 #        self.thread_pool_size = self.config.get("thread_pool_size", 4)
 
@@ -169,6 +172,24 @@ class IRCBot:
                 self.channels.append(channel)
             print(term.green(f"Bot successfully joined {channel}"))
 
+    def _handle_ping_stats(self, line, start_time, processing_time):
+        """Handles PING messages and updates statistics."""
+        self.ping_stats["count"] += 1
+        self.ping_stats["total_time"] += processing_time
+        self.ping_stats["times"].append(processing_time)
+
+        if self.ping_stats["count"] % 10 == 0:
+            avg_ping_time = self.ping_stats["total_time"] / self.ping_stats["count"]
+            print(term.yellow(f"Average ping processing time: {avg_ping_time:.4f} seconds"))
+            self.ping_stats["count"] = 0
+            self.ping_stats["total_time"] = 0.0
+            self.ping_stats["times"].clear()
+        """Handles JOIN messages."""
+        if nick == self.nickname:
+            if channel not in self.channels:
+                self.channels.append(channel)
+            print(term.green(f"Bot successfully joined {channel}"))
+
     def _handle_numeric_reply(self, reply_code, reply_text):
         """Handles numeric replies (error codes)."""
         error_messages = {
@@ -276,7 +297,7 @@ class IRCBot:
         self.handle_command(target, message, sender)
 
     def process_data(self, raw_data):
-        """Processes incoming raw data."""
+        """Processes incoming raw data and process URL. It also handle PING messages."""
         start_time = time.time()
         try:
             data = self._decode_data(raw_data)
@@ -288,8 +309,9 @@ class IRCBot:
                 print(f"Received: {line}")
 
                 if self._is_ping(line):
-                    self._handle_ping(line)
-                    continue
+                    processing_time = time.time() - start_time
+                    self._handle_ping_stats(line, start_time, processing_time)
+                    start_time = time.time()
 
                 if match_join := self._find_join_match(line):
                     nick, channel = match_join.groups()
@@ -310,12 +332,14 @@ class IRCBot:
                     for url in url_match:
                         self._handle_url(url)
 
-        except (UnicodeDecodeError, IOError) as e:
+        except (UnicodeDecodeError, IOError, Exception) as e:
             print(term.red(f"Error in process_data: {e}"))
             traceback.print_exc()
         finally:
-            processing_time = time.time() - start_time
-            print(term.yellow(f"Processed message in {processing_time:.4f} seconds"))
+            # Handle stats for non ping messages
+            if not self._is_ping(line):
+                processing_time = time.time() - start_time
+                print(term.yellow(f"Processed message in {processing_time:.4f} seconds"))
 
 
     # ... (rest of the IRCBot class and other functions)
@@ -386,7 +410,6 @@ class IRCBot:
             thread.start()
         resource_thread = threading.Thread(target=self.resource_monitor, daemon=True)
         resource_thread.start()
-
 
         try:
             while self.running:
