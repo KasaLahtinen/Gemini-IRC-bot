@@ -14,6 +14,7 @@ from collections import deque
 import psutil
 import chardet
 import validators
+from collections import deque
 from blessed import Terminal
 import yaml
 import requests
@@ -60,8 +61,11 @@ class IRCBot:
         self.nickname = self.config["bot"]["nickname"]
         self.channels = self.config["bot"]["channels"]
         self.ping_stats = {"count": 0, "total_time": 0.0, "times": deque()}
+<<<<<<< HEAD
         self.command_manager = CommandManager()  # Create CommandManager instance
         self.register_commands()
+=======
+>>>>>>> 95b6f7eeb209c6f3031ef3847192e7634f84f0ae
 
         # Get thread_pool_size with a default value
 
@@ -146,7 +150,11 @@ class IRCBot:
                 self.channels.append(channel)
             print(term.green(f"Bot successfully joined {channel}"))
 
+<<<<<<< HEAD
     def _handle_ping_stats(self, processing_time):
+=======
+    def _handle_ping_stats(self, line, start_time, processing_time):
+>>>>>>> 95b6f7eeb209c6f3031ef3847192e7634f84f0ae
         """Handles PING messages and updates statistics."""
         self.ping_stats["count"] += 1
         self.ping_stats["total_time"] += processing_time
@@ -154,11 +162,15 @@ class IRCBot:
 
         if self.ping_stats["count"] % 10 == 0:
             avg_ping_time = self.ping_stats["total_time"] / self.ping_stats["count"]
+<<<<<<< HEAD
             print(
                 term.yellow(
                     f"Average ping processing time: {avg_ping_time:.4f} seconds"
                 )
             )
+=======
+            print(term.yellow(f"Average ping processing time: {avg_ping_time:.4f} seconds"))
+>>>>>>> 95b6f7eeb209c6f3031ef3847192e7634f84f0ae
             self.ping_stats["count"] = 0
             self.ping_stats["total_time"] = 0.0
             self.ping_stats["times"].clear()
@@ -289,9 +301,15 @@ class IRCBot:
                     processing_time = time.time()
                     self._handle_ping(line)
                     processing_time = time.time() - start_time
+<<<<<<< HEAD
                     self._handle_ping_stats(processing_time)
                     start_time = time.time()
                     continue
+=======
+                    self._handle_ping_stats(line, start_time, processing_time)
+                    start_time = time.time()
+                    continue 
+>>>>>>> 95b6f7eeb209c6f3031ef3847192e7634f84f0ae
 
                 if match_join := self._find_join_match(line):
                     nick, channel = match_join.groups()
@@ -314,16 +332,51 @@ class IRCBot:
                     for url in url_match:
                         self._handle_url(url)
 
-        except (UnicodeDecodeError, IOError) as e:
+        except (UnicodeDecodeError, IOError, Exception) as e:
             print(term.red(f"Error in process_data: {e}"))
             traceback.print_exc()
         finally:
             # Handle stats for non ping messages
+<<<<<<< HEAD
             if not self._is_ping(line) and not self._is_pong(line):
                 processing_time = time.time() - start_time
                 print(
                     term.yellow(f"Processed message in {processing_time:.4f} seconds")
                 )
+=======
+            if not self._is_ping(line):
+                processing_time = time.time() - start_time
+                print(term.yellow(f"Processed message in {processing_time:.4f} seconds"))
+
+
+    # ... (rest of the IRCBot class and other functions)
+    def handle_command(self, target, message, sender=None):
+        """Handles user commands."""
+        parts = message.split()
+        if parts:
+            command = parts[0].lower()
+            args = parts[1:]
+            if command in self.command_handlers:
+                try:
+                    self.command_handlers[command](self, target, sender, *args)
+                except TypeError as e:
+                    print(
+                        term.red(
+                            f"Error executing command {command}: {e}. Check function signature."
+                        )
+                    )
+                except (ValueError, IOError) as e:
+                    print(
+                        term.red(
+                            f"An error occurred while executing command {command}: {e}"
+                        )
+                    )
+                    traceback.print_exc()
+
+    def register_command(self, command, handler):
+        """Registers a command handler."""
+        self.command_handlers[command.lower()] = handler
+>>>>>>> 95b6f7eeb209c6f3031ef3847192e7634f84f0ae
 
     def channel_worker(self, channel, message_queue):
         """Worker thread for handling a specific channel."""
