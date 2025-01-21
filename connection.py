@@ -1,3 +1,5 @@
+"""Handles core IRC connection"""
+
 import socket
 from ssl import create_default_context
 
@@ -28,7 +30,7 @@ class Connection:
                 self.sock = context.wrap_socket(self.sock)
             print("Connected!")
             self.sock.settimeout(None)
-        except Exception as e:
+        except IOError as e:
             print(f"Connection failed: {e}")
             self.sock = None
             return False
@@ -37,7 +39,7 @@ class Connection:
             self.send_raw(f"USER {self.nickname} 0 * :{self.nickname}\r\n")
             # for channel in self.channels:
             # self.join_channel(channel)
-        except Exception as e:
+        except IOError as e:
             print(e)
             return False
         return True
@@ -49,7 +51,7 @@ class Connection:
             try:
                 self.sock.sendall(b"QUIT\r\n")
                 self.sock.close()
-            except Exception as e:
+            except IOError as e:
                 print(f"Error disconnecting: {e}")
             self.sock = None
 
@@ -59,7 +61,7 @@ class Connection:
             try:
                 data_bytes = data.encode("utf-8")
                 self.sock.sendall(data_bytes)
-            except Exception as e:
+            except IOError as e:
                 print(f"Error sending data: {e}")
 
     def recv_data(self):
@@ -70,4 +72,5 @@ class Connection:
                 return data
             except IOError as e:
                 print(f"Error receiving data: {e}")
-                return None
+                return e
+        return False
