@@ -1,0 +1,7 @@
+pyyaml
+blessed
+requests
+beautifulsoup4
+psutil
+chardet
+validators
