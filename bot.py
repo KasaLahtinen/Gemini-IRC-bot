@@ -304,19 +304,12 @@ class IRCBot:
                 print(f"Received: {line}")
 
                 if self._is_ping(line):
-<<<<<<< HEAD
                     processing_time = time.time()
                     self._handle_ping(line)
                     processing_time = time.time() - start_time
                     self._handle_ping_stats(line, start_time, processing_time)
                     start_time = time.time()
                     continue 
-=======
-                    start_time = time.time()
-                    self._handle_ping(line)
-                    processing_time = time.time() - start_time
-                    self._handle_ping_stats(line, start_time, processing_time)
->>>>>>> origin/IDX
 
                 if match_join := self._find_join_match(line):
                     nick, channel = match_join.groups()
