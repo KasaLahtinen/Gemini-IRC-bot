@@ -17,6 +17,11 @@ from blessed import Terminal
 import yaml
 import requests
 from bs4 import BeautifulSoup
+from commands import (
+    Command,
+    CommandManager,
+    hello_command,
+)  # Import the command classes
 
 
 term = Terminal()
@@ -24,7 +29,6 @@ term = Terminal()
 
 class IRCBot:
     """IRC Bot class"""
-
 
     def _load_config(self, config_file):
         """Loads the configuration from the YAML file."""
@@ -34,26 +38,41 @@ class IRCBot:
         except FileNotFoundError:
             print(term.red(f"Error: Configuration file '{config_file}' not found."))
             sys.exit(1)
-        except yaml.YAMLError as e: #Catch yaml errors
+        except yaml.YAMLError as e:  # Catch yaml errors
             print(term.red(f"Error: Invalid YAML in configuration file: {e}"))
             sys.exit(1)
 
-    def __init__(self): #Set default to yaml
+    def __init__(self):  # Set default to yaml
         """Initializes the IRC bot from a configuration file."""
-#        self.config_file = config_file
+        #        self.config_file = config_file
         self.config = self._load_config("config.yaml")
         self.socket = None
         self.running = True
-        self.command_handlers = {}
+        #        self.command_handlers = {}
         self.nickname = self.config["bot"]["nickname"]
         self.channels = self.config["bot"]["channels"]
         self.ping_stats = {"count": 0, "total_time": 0.0, "times": deque()}
+        self.command_manager = CommandManager()  # Create CommandManager instance
+        self.register_commands()
 
         # Get thread_pool_size with a default value
-#        self.thread_pool_size = self.config.get("thread_pool_size", 4)
+
+    #        self.thread_pool_size = self.config.get("thread_pool_size", 4)
+
+    def register_commands(self):
+        """Registers the commands through CommandManager"""
+        self.command_manager.register(Command("!hello", hello_command, "Says hello"))
+
+    #        self.command_manager.register(Command("!join", join_command, "Joins a channel"))
+
+    def handle_command(self, target, message, sender):
+        """Calls the registered command from CommandManager"""
+        self.command_manager.execute(
+            self, target, message, sender
+        )  # Use command manager to execute commands
 
     def resource_monitor(self, interval=600):
-        """ Resource monitoring """
+        """Resource monitoring"""
         while self.running:
             log_resource_usage()
             time.sleep(interval)
@@ -61,7 +80,7 @@ class IRCBot:
     def connect(self):
         """Connects to the IRC server with enhanced error handling."""
         try:
-            if self.config['connection']["use_ssl"]:
+            if self.config["connection"]["use_ssl"]:
                 context = ssl.create_default_context()
                 context.verify_mode = ssl.CERT_REQUIRED
                 context.check_hostname = True
@@ -69,18 +88,18 @@ class IRCBot:
 
                 raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.socket = context.wrap_socket(
-                    raw_socket, server_hostname=self.config['connection']["server"]
+                    raw_socket, server_hostname=self.config["connection"]["server"]
                 )
             else:
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
             self.socket.settimeout(10)  # Set a timeout for the connect operation
-            self.socket.connect((
-                self.config['connection']["server"], self.config['connection']["port"]
-            ))
+            self.socket.connect(
+                (self.config["connection"]["server"], self.config["connection"]["port"])
+            )
             self.socket.settimeout(None)  # Remove timeout after successful connection
 
-            if self.config['connection']["password"]:
+            if self.config["connection"]["password"]:
                 self.send_raw(f"PASS {self.config['connection']['password']}\r\n")
             self.send_raw(f"NICK {self.nickname}\r\n")
             self.send_raw(f"USER {self.nickname} 0 * :{self.nickname}\r\n")
@@ -89,17 +108,29 @@ class IRCBot:
                 self.join_channel(channel)
 
         except ssl.SSLError as e:
-            print(term.red(f"SSL error connecting to "
-                           f"{self.config['connection']['server']}:"
-                           f"{self.config['connection']['port']}: {e}"))
+            print(
+                term.red(
+                    f"SSL error connecting to "
+                    f"{self.config['connection']['server']}:"
+                    f"{self.config['connection']['port']}: {e}"
+                )
+            )
             return False
         except socket.timeout:
-            print(term.red(f"Connection to {self.config['connection']['server']}:"
-                           f"{self.config['connection']['port']} timed out."))
+            print(
+                term.red(
+                    f"Connection to {self.config['connection']['server']}:"
+                    f"{self.config['connection']['port']} timed out."
+                )
+            )
             return False
         except socket.error as e:
-            print(term.red(f"Error connecting to {self.config['connection']['server']}:"
-                           f"{self.config['connection']['port']}: {e}"))
+            print(
+                term.red(
+                    f"Error connecting to {self.config['connection']['server']}:"
+                    f"{self.config['connection']['port']}: {e}"
+                )
+            )
             return False
         return True
 
@@ -180,7 +211,11 @@ class IRCBot:
 
         if self.ping_stats["count"] % 10 == 0:
             avg_ping_time = self.ping_stats["total_time"] / self.ping_stats["count"]
-            print(term.yellow(f"Average ping processing time: {avg_ping_time:.4f} seconds"))
+            print(
+                term.yellow(
+                    f"Average ping processing time: {avg_ping_time:.4f} seconds"
+                )
+            )
             self.ping_stats["count"] = 0
             self.ping_stats["total_time"] = 0.0
             self.ping_stats["times"].clear()
@@ -200,21 +235,16 @@ class IRCBot:
         """Fetches URL, determines file type, and extracts HTML metadata."""
         try:
             headers = {
-                'User-Agent': (
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                    'AppleWebKit/537.36 (KHTML, like Gecko) '
-                    'Chrome/119.0.0.0 Safari/537.36'
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/119.0.0.0 Safari/537.36"
                 )
             }
-            response = requests.get(
-                url,
-                stream=True,
-                timeout=5,
-                headers=headers
-            )
+            response = requests.get(url, stream=True, timeout=5, headers=headers)
             response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
 
-            content_type = response.headers.get('Content-Type')
+            content_type = response.headers.get("Content-Type")
             file_type, encoding = mimetypes.guess_type(url)
             print(term.green(f"Encoding: {encoding}"))
             print(term.green(f"Content-Type: {content_type}"))
@@ -225,14 +255,18 @@ class IRCBot:
                 content = b""
                 for chunk in response.iter_content(chunk_size=chunk_size):
                     content += chunk
-                    if len(content) > 1024 * 1024: #Limit to 1MB
-                        print(term.yellow("HTML content truncated (1MB limit reached)."))
+                    if len(content) > 1024 * 1024:  # Limit to 1MB
+                        print(
+                            term.yellow("HTML content truncated (1MB limit reached).")
+                        )
                         break
                 soup = BeautifulSoup(content, "html.parser")
                 title = soup.title.string.strip() if soup.title else None
                 description_meta = soup.find("meta", attrs={"name": "description"})
                 if not description_meta:
-                    description_meta = soup.find("meta", attrs={"property": "og:description"})
+                    description_meta = soup.find(
+                        "meta", attrs={"property": "og:description"}
+                    )
                 if description_meta and description_meta.has_attr("content"):
                     description = description_meta["content"].strip()
                 else:
@@ -244,12 +278,12 @@ class IRCBot:
         except requests.exceptions.RequestException as e:
             print(term.red(f"Error fetching URL {url}: {e}"))
             return None, None, None
-        #except Exception as e:
+        # except Exception as e:
         #    print(term.red(f"An unexpected error occurred while processing url {url}: {e}"))
         traceback.print_exc()
         return None, None, None
 
-    def _handle_url(self, url, target=None): # Target now optional
+    def _handle_url(self, url, target=None):  # Target now optional
         """Handles URL detection and validation."""
         print(term.green(f"Detected URL: {url}"))
         if validators.url(url):
@@ -257,15 +291,17 @@ class IRCBot:
             file_type, title, description = self._get_url_info(url)
             if file_type:
                 print(term.green(f"File Type: {file_type}"))
-            if title and target: #Only send message if target is given
+            if title and target:  # Only send message if target is given
                 self.send_message(target, f"Title: {title}")
-            if description and target: #Only send message if target is given
+            if description and target:  # Only send message if target is given
                 self.send_message(target, f"Description: {description}")
         else:
             print(term.red(f"{url} is not a valid URL"))
 
     def _is_ping(self, line):
         return line.startswith("PING")
+    def _is_pong(self, line):
+        return line.startswith("PONG")
 
     def _find_join_match(self, line):
         return re.search(r"^:([^!]+)!.* JOIN :(.+)$", line)
@@ -285,7 +321,9 @@ class IRCBot:
             for url in url_match:
                 self._handle_url(url, target)
 
-        self._handle_privmsg_content(sender, target, message) #Handle the message content
+        self._handle_privmsg_content(
+            sender, target, message
+        )  # Handle the message content
 
     def _handle_privmsg_content(self, sender, target, message):
         """Handles the actual content of a PRIVMSG (commands, etc.)."""
@@ -317,7 +355,9 @@ class IRCBot:
                     continue
 
                 if match_numeric := self._find_numeric_match(line):
-                    self._handle_numeric_reply(match_numeric.group(1), match_numeric.group(2))
+                    self._handle_numeric_reply(
+                        match_numeric.group(1), match_numeric.group(2)
+                    )
                     continue
 
                 if match_privmsg := self._find_privmsg_match(line):
@@ -335,38 +375,11 @@ class IRCBot:
             traceback.print_exc()
         finally:
             # Handle stats for non ping messages
-            if not self._is_ping(line):
+            if not self._is_ping(line) and not self._is_pong(line):
                 processing_time = time.time() - start_time
-                print(term.yellow(f"Processed message in {processing_time:.4f} seconds"))
-
-
-    # ... (rest of the IRCBot class and other functions)
-    def handle_command(self, target, message, sender=None):
-        """Handles user commands."""
-        parts = message.split()
-        if parts:
-            command = parts[0].lower()
-            args = parts[1:]
-            if command in self.command_handlers:
-                try:
-                    self.command_handlers[command](self, target, sender, *args)
-                except TypeError as e:
-                    print(
-                        term.red(
-                            f"Error executing command {command}: {e}. Check function signature."
-                        )
-                    )
-                except (ValueError, IOError) as e:
-                    print(
-                        term.red(
-                            f"An error occurred while executing command {command}: {e}"
-                        )
-                    )
-                    traceback.print_exc()
-
-    def register_command(self, command, handler):
-        """Registers a command handler."""
-        self.command_handlers[command.lower()] = handler
+                print(
+                    term.yellow(f"Processed message in {processing_time:.4f} seconds")
+                )
 
     def channel_worker(self, channel, message_queue):
         """Worker thread for handling a specific channel."""
@@ -439,43 +452,18 @@ class IRCBot:
                 thread.join(timeout=2)
             self.disconnect()
 
-
-def hello_command(bot, target, sender):
-    """Responds with a greeting."""
-    if sender:
-        bot.send_message(target, f"Hello, {sender}!")
-    else:
-        bot.send_message(target, "Hello!")
-
-
-def join_command(bot, target, sender, *args):
-    """Makes the bot join a channel."""
-    if sender and len(args) > 0:
-        channel_to_join = args[0]
-        if not channel_to_join.startswith("#"):
-            bot.send_message(target, "Channel names must start with #")
-            return
-
-        if channel_to_join in bot.channels:
-            bot.send_message(target, f"I am already in {channel_to_join}")
-            return
-
-        bot.join_channel(channel_to_join)
-        bot.send_message(target, f"Joining {channel_to_join} as requested by {sender}")
-    else:
-        bot.send_message(target, "Usage: !join #channel")
-
 def log_resource_usage():
-    """ Log resource usage """
+    """Log resource usage"""
     process = psutil.Process()
     memory_info = process.memory_info()
     cpu_percent = process.cpu_percent(interval=1)
     print(term.blue(f"Memory usage: {memory_info.rss / 1024 / 1024:.2f} MB"))
     print(term.blue(f"CPU usage: {cpu_percent:.2f}%"))
 
+
 if __name__ == "__main__":
     Bot = IRCBot()
-#    Bot.register_command("!hello", hello_command)
-#    Bot.register_command("!join", join_command)
+    #    Bot.register_command("!hello", hello_command)
+    #    Bot.register_command("!join", join_command)
     print(term.green("Starting bot .."))
     Bot.run()
