@@ -1,3 +1,4 @@
+# connection.py
 """Handles core IRC connection"""
 
 import socket
