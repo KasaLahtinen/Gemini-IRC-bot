@@ -301,7 +301,7 @@ class IRCBot:
         start_time = time.time()
         try:
             data = self._decode_data(raw_data)
-
+            line = ""
             for line in data.splitlines():
                 line = line.strip()
                 if not line:
