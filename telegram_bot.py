@@ -85,9 +85,11 @@ def broadcast_monitor(interval=2):
                     
                     if chat_ids:
                         logger.info(f"Broadcasting message to Telegram (ID: {msg_id})")
+                        # Strip IRC control codes (bold, color, normal, etc)
+                        clean_message = re.sub(r'[\x02\x0F\x16\x1D\x1F]|\x03(\d{1,2}(,\d{1,2})?)?', '', message)
                         for chat_id in chat_ids:
                             try:
-                                bot.send_message(chat_id, message)
+                                bot.send_message(chat_id, clean_message)
                             except Exception as e:
                                 logger.error(f"Failed to broadcast to {chat_id}: {e}")
                                 

@@ -236,6 +236,19 @@ class IRCBot:
             self.heavy_cooldowns[sender_nick] = time.time()
         self.url_pool.submit(self._process_heavy_url_worker, url, target)
 
+    def _cross_publish_to_telegram(self, text):
+        """Helper to enqueue a message for the Telegram bot to broadcast."""
+        try:
+            import sqlite3
+            from link_preview import DB_PATH
+            with sqlite3.connect(DB_PATH) as conn:
+                cursor = conn.cursor()
+                # status=1 means IRC won't broadcast it, tg_status=0 means TG will
+                cursor.execute("INSERT INTO broadcast_queue (message, status, tg_status) VALUES (?, 1, 0)", (text,))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to cross-publish to Telegram: {e}")
+
     def _process_heavy_url_worker(self, url, target=None):
         """Worker method for heavy URL parsing to avoid blocking."""
         logger.info(f"Detected heavy URL: {url}")
@@ -246,6 +259,7 @@ class IRCBot:
                 for line in preview_text.splitlines():
                     if line.strip():
                         self.send_message(target, line.strip())
+                self._cross_publish_to_telegram(preview_text)
         else:
             logger.error(f"{url} is not a valid URL")
 
@@ -259,6 +273,7 @@ class IRCBot:
                 for line in preview_text.splitlines():
                     if line.strip():
                         self.send_message(target, line.strip())
+                self._cross_publish_to_telegram(preview_text)
         else:
             logger.error(f"{url} is not a valid URL")
 
