@@ -26,6 +26,7 @@ from commands import (
 from connection import Connection
 from link_preview import get_link_preview
 from loguru import logger
+from threat_checker import update_threat_db, get_threat_info
 
 
 class IRCBot:
@@ -111,6 +112,21 @@ class IRCBot:
             except Exception as e:
                 logger.error(f"Error in broadcast monitor: {e}")
             time.sleep(interval)
+
+    def threat_monitor(self, interval_hours=24):
+        """Monitors and updates the threat database periodically."""
+        interval_seconds = interval_hours * 3600
+        while self.running:
+            try:
+                update_threat_db(self.config)
+            except Exception as e:
+                logger.error(f"Error in threat monitor: {e}")
+            
+            # Sleep in chunks to allow quick shutdown
+            for _ in range(int(interval_seconds)):
+                if not self.running:
+                    break
+                time.sleep(1)
 
     def connect(self):
         """Connects to the IRC server."""
@@ -252,6 +268,14 @@ class IRCBot:
     def _process_heavy_url_worker(self, url, target=None):
         """Worker method for heavy URL parsing to avoid blocking."""
         logger.info(f"Detected heavy URL: {url}")
+        
+        is_threat, reason = get_threat_info(url)
+        if is_threat:
+            logger.warning(f"Blocked malicious heavy URL {url}: {reason}")
+            if target:
+                self.send_message(target, f"[WARNING] Blocked malicious URL: {reason}")
+            return
+            
         if validators.url(url):
             logger.info(f"{url} is a valid URL")
             preview_text = get_link_preview(url, force_heavy=True)
@@ -266,6 +290,14 @@ class IRCBot:
     def _process_url_worker(self, url, target=None):
         """Worker method for URL parsing to avoid blocking."""
         logger.info(f"Detected URL: {url}")
+        
+        is_threat, reason = get_threat_info(url)
+        if is_threat:
+            logger.warning(f"Blocked malicious URL {url}: {reason}")
+            if target:
+                self.send_message(target, f"[WARNING] Blocked malicious URL: {reason}")
+            return
+            
         if validators.url(url):
             logger.info(f"{url} is a valid URL")
             preview_text = get_link_preview(url)
@@ -409,6 +441,10 @@ class IRCBot:
         
         broadcast_thread = threading.Thread(target=self.broadcast_monitor, daemon=True)
         broadcast_thread.start()
+
+        update_interval = self.config.get("threats", {}).get("update_interval_hours", 24)
+        threat_thread = threading.Thread(target=self.threat_monitor, args=(update_interval,), daemon=True)
+        threat_thread.start()
 
         try:
             while self.running:

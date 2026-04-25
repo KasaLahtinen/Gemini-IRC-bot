@@ -11,3 +11,15 @@ thread_pool_size: 4
 
 telegram:
   chat_ids: [-1002751088027]  # List of numeric chat IDs to broadcast to
+
+threats:
+  update_interval_hours: 24
+  sources:
+    - name: "URLhaus"
+      url: "https://urlhaus.abuse.ch/downloads/hostfile/"
+      type: "urlhaus"
+      enabled: true
+    # - name: "PhishTank"
+    #   url: "http://data.phishtank.com/data/online-valid.csv"
+    #   type: "phishtank"
+    #   enabled: false

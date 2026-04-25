@@ -45,6 +45,17 @@ def init_db():
         except sqlite3.OperationalError:
             pass  # Column already exists
             
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS threat_domains (
+                domain TEXT PRIMARY KEY,
+                source TEXT,
+                reason TEXT,
+                timestamp REAL
+            )
+            """
+        )
+            
         conn.commit()
 
 
