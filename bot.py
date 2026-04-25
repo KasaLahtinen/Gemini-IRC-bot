@@ -88,6 +88,29 @@ class IRCBot:
             log_resource_usage()
             time.sleep(interval)
 
+    def broadcast_monitor(self, interval=2):
+        """Monitors the SQLite broadcast queue and sends messages to channels."""
+        import sqlite3
+        from link_preview import DB_PATH
+        while self.running:
+            try:
+                with sqlite3.connect(DB_PATH) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT id, message FROM broadcast_queue WHERE status = 0")
+                    rows = cursor.fetchall()
+                    for row in rows:
+                        msg_id, message = row
+                        logger.info(f"Broadcasting message from queue (ID: {msg_id})")
+                        for channel in self.channels:
+                            self.send_message(channel, message)
+                        cursor.execute("DELETE FROM broadcast_queue WHERE id = ?", (msg_id,))
+                    conn.commit()
+            except sqlite3.OperationalError:
+                pass # Table might not exist yet
+            except Exception as e:
+                logger.error(f"Error in broadcast monitor: {e}")
+            time.sleep(interval)
+
     def connect(self):
         """Connects to the IRC server."""
         self.connection.connect()
@@ -367,6 +390,9 @@ class IRCBot:
             thread.start()
         resource_thread = threading.Thread(target=self.resource_monitor, daemon=True)
         resource_thread.start()
+        
+        broadcast_thread = threading.Thread(target=self.broadcast_monitor, daemon=True)
+        broadcast_thread.start()
 
         try:
             while self.running:

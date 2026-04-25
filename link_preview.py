@@ -29,6 +29,16 @@ def init_db():
             cursor.execute("ALTER TABLE url_cache ADD COLUMN is_heavy INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass  # Column already exists
+            
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS broadcast_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message TEXT,
+                status INTEGER DEFAULT 0
+            )
+            """
+        )
         conn.commit()
 
 
