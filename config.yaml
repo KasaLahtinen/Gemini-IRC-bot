@@ -1,16 +1,16 @@
 connection:
-  server: "irc.trex.fi"
+  server: "irc.example.com"
   port: 6667
   use_ssl: false
 #  password: "your_password"
 bot:
-  nickname: "martoc"
-  channels: ["#psykoosi","#kartano","#projekti"]
+  nickname: "mybot"
+  channels: ["#example"]
   command_prefix: "!"
 thread_pool_size: 4
 
 telegram:
-  chat_ids: [-1002751088027]  # List of numeric chat IDs to broadcast to
+  chat_ids: [123456789]  # List of numeric chat IDs to broadcast to
 
 threats:
   update_interval_hours: 24
