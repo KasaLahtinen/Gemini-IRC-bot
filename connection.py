@@ -27,7 +27,7 @@ class Connection:
         try:
             self.sock.connect((self.server, self.port))
             if self.use_ssl:
-                self.sock = context.wrap_socket(self.sock)
+                self.sock = context.wrap_socket(self.sock, server_hostname=self.server)
             print("Connected!")
             self.sock.settimeout(None)
         except IOError as e:
