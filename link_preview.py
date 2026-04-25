@@ -35,10 +35,16 @@ def init_db():
             CREATE TABLE IF NOT EXISTS broadcast_queue (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message TEXT,
-                status INTEGER DEFAULT 0
+                status INTEGER DEFAULT 0,
+                tg_status INTEGER DEFAULT 0
             )
             """
         )
+        try:
+            cursor.execute("ALTER TABLE broadcast_queue ADD COLUMN tg_status INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+            
         conn.commit()
 
 

@@ -8,3 +8,6 @@ bot:
   channels: ["#psykoosi","#kartano","#projekti"]
   command_prefix: "!"
 thread_pool_size: 4
+
+telegram:
+  chat_ids: [-1002751088027]  # List of numeric chat IDs to broadcast to

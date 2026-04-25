@@ -212,6 +212,10 @@ psutil==7.2.2 \
     --hash=sha256:eed63d3b4d62449571547b60578c5b2c4bcccc5387148db46e0c2313dad0ee00 \
     --hash=sha256:fd04ef36b4a6d599bbdb225dd1d3f51e00105f6d48a28f006da7f9822f2606d8
     # via -r Gemini-IRC-bot/requirements.in
+pytelegrambotapi==4.33.0 \
+    --hash=sha256:0c34ded8c6f7afe41b8d591ef102aeaa9ca158d97ec50309279d09a6603e0ffb \
+    --hash=sha256:df35be14d015d6ac874768db848d0c6d7864f586b242d4902efa2244efca6512
+    # via -r Gemini-IRC-bot/requirements.in
 pyyaml==6.0.3 \
     --hash=sha256:00c4bdeba853cc34e7dd471f16b4114f4162dc03e6b7afcc2128711f0eca823c \
     --hash=sha256:0150219816b6a1fa26fb4699fb7daa9caf09eb1999f3b70fb6e786805e80375a \
@@ -290,7 +294,9 @@ pyyaml==6.0.3 \
 requests==2.33.1 \
     --hash=sha256:18817f8c57c6263968bc123d237e3b8b08ac046f5456bd1e307ee8f4250d3517 \
     --hash=sha256:4e6d1ef462f3626a1f0a0a9c42dd93c63bad33f9f1c1937509b8c5c8718ab56a
-    # via -r Gemini-IRC-bot/requirements.in
+    # via
+    #   -r Gemini-IRC-bot/requirements.in
+    #   pytelegrambotapi
 soupsieve==2.8.3 \
     --hash=sha256:3267f1eeea4251fb42728b6dfb746edc9acaffc4a45b27e19450b676586e8349 \
     --hash=sha256:ed64f2ba4eebeab06cc4962affce381647455978ffc1e36bb79a545b91f45a95

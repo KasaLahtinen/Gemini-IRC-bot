@@ -103,7 +103,8 @@ class IRCBot:
                         logger.info(f"Broadcasting message from queue (ID: {msg_id})")
                         for channel in self.channels:
                             self.send_message(channel, message)
-                        cursor.execute("DELETE FROM broadcast_queue WHERE id = ?", (msg_id,))
+                        cursor.execute("UPDATE broadcast_queue SET status = 1 WHERE id = ?", (msg_id,))
+                        cursor.execute("DELETE FROM broadcast_queue WHERE status = 1 AND tg_status = 1")
                     conn.commit()
             except sqlite3.OperationalError:
                 pass # Table might not exist yet

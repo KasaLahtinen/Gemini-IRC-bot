@@ -5,3 +5,4 @@ psutil
 chardet
 validators
 loguru
+pyTelegramBotAPI
