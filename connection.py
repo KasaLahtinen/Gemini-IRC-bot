@@ -1,6 +1,7 @@
 """Handles core IRC connection"""
 
 import socket
+import ssl
 from ssl import create_default_context
 
 
@@ -21,6 +22,7 @@ class Connection:
         context = None
         if self.use_ssl:
             context = create_default_context()
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(2)  # Set timeout to avoid hanging connections
         print(f"Connecting to {self.server}:{self.port}...")
