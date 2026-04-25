@@ -25,6 +25,10 @@ def init_db():
             )
             """
         )
+        try:
+            cursor.execute("ALTER TABLE url_cache ADD COLUMN is_heavy INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         conn.commit()
 
 
@@ -48,19 +52,21 @@ def trigger_heavy_crawler(url):
 def get_link_preview(url, force_heavy=False) -> str | None:
     """Fetches URL, determines file type, extracts HTML metadata, and returns a formatted preview."""
 
-    if not force_heavy:
-        try:
-            with sqlite3.connect(DB_PATH) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT preview, timestamp FROM url_cache WHERE url = ?", (url,))
-                row = cursor.fetchone()
-                if row:
-                    preview, timestamp = row
-                    if time.time() - timestamp < 86400:  # 24 hours
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT preview, timestamp, is_heavy FROM url_cache WHERE url = ?", (url,))
+            row = cursor.fetchone()
+            if row:
+                preview, timestamp, is_heavy = row
+                if time.time() - timestamp < 86400:  # 24 hours
+                    # If force_heavy is True, we only return the cache if the cached item is also heavy.
+                    # Otherwise, any cached preview is fine.
+                    if not force_heavy or is_heavy:
                         logger.info("Returning cached preview.")
                         return preview
-        except Exception as e:
-            logger.error(f"Error reading from cache: {e}")
+    except Exception as e:
+        logger.error(f"Error reading from cache: {e}")
 
     file_type = None
     title = None
@@ -145,13 +151,16 @@ def get_link_preview(url, force_heavy=False) -> str | None:
 
     final_preview = "\n".join(parts) if parts else None
 
+    # Track if we actually used the heavy crawler
+    actually_heavy = 1 if (force_heavy or title == "AI Summary") else 0
+
     if final_preview:
         try:
             with sqlite3.connect(DB_PATH) as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    "INSERT OR REPLACE INTO url_cache (url, preview, timestamp) VALUES (?, ?, ?)",
-                    (url, final_preview, time.time()),
+                    "INSERT OR REPLACE INTO url_cache (url, preview, timestamp, is_heavy) VALUES (?, ?, ?, ?)",
+                    (url, final_preview, time.time(), actually_heavy),
                 )
                 conn.commit()
         except Exception as e:
