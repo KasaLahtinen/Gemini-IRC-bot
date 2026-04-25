@@ -29,10 +29,9 @@ class Command:
                 e,
             )
         except (ValueError, IOError) as e:
-            logger.error(
-                "An error occurred while executing command %s: %s", self.name, e
-            )
+            logger.error("An error occurred while executing command %s: %s", self.name, e)
         traceback.print_exc()
+
 
 class CommandManager:
     """Manages IRC commands."""

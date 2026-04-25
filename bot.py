@@ -5,7 +5,7 @@ import mimetypes
 import os
 import queue
 
-#import ssl
+# import ssl
 import re
 import socket
 import sys
@@ -20,7 +20,6 @@ import psutil
 import requests
 import validators
 import yaml
-from blessed import Terminal
 from bs4 import BeautifulSoup
 from commands import (
     Command,
@@ -28,8 +27,7 @@ from commands import (
     hello_command,
 )  # Import the command classes
 from connection import Connection
-
-term = Terminal()
+from loguru import logger
 
 
 class IRCBot:
@@ -41,10 +39,10 @@ class IRCBot:
             with open(config_file, "r", encoding="utf-8") as f:
                 return yaml.safe_load(f)  # Use yaml.safe_load()
         except FileNotFoundError:
-            print(term.red(f"Error: Configuration file '{config_file}' not found."))
+            logger.error(f"Error: Configuration file '{config_file}' not found.")
             sys.exit(1)
         except yaml.YAMLError as e:  # Catch yaml errors
-            print(term.red(f"Error: Invalid YAML in configuration file: {e}"))
+            logger.error(f"Error: Invalid YAML in configuration file: {e}")
             sys.exit(1)
 
     def __init__(self):  # Set default to yaml
@@ -81,9 +79,7 @@ class IRCBot:
 
     def handle_command(self, target, message, sender):
         """Calls the registered command from CommandManager"""
-        self.command_manager.execute(
-            self, target, message, sender
-        )  # Use command manager to execute commands
+        self.command_manager.execute(self, target, message, sender)  # Use command manager to execute commands
 
     def resource_monitor(self, interval=600):
         """Resource monitoring"""
@@ -110,14 +106,14 @@ class IRCBot:
         try:
             self.send_raw(f"JOIN {channel}\r\n")
         except socket.error as e:
-            print(term.red(f"Error joining channel {channel}: {e}"))
+            logger.error(f"Error joining channel {channel}: {e}")
 
     def send_message(self, target, message):
         """Sends a message with error handling."""
         try:
             self.send_raw(f"PRIVMSG {target} :{message}\r\n")
         except (UnicodeEncodeError, IOError) as e:
-            print(term.red(f"Error sending message to {target}: {e}"))
+            logger.error(f"Error sending message to {target}: {e}")
 
     def _decode_data(self, raw_data):
         """Decodes raw data, handling encoding errors."""
@@ -128,16 +124,16 @@ class IRCBot:
             encoding = encoding_result["encoding"]
             if encoding:
                 decoded_data = raw_data.decode(encoding)
-                print(term.green(f"Detected encoding: {encoding}"))
+                logger.info(f"Detected encoding: {encoding}")
                 return decoded_data
             decoded_data = raw_data.decode("latin-1", errors="replace")
-            print(term.green("Fallback to latin-1"))
+            logger.info("Fallback to latin-1")
             return decoded_data
         except IOError as e:
-            print(term.red(f"Error decoding data: {e}"))
+            logger.error(f"Error decoding data: {e}")
             traceback.print_exc()
             decoded_data = raw_data.decode("latin-1", errors="replace")
-            print(term.green("Fallback to latin-1"))
+            logger.info("Fallback to latin-1")
             return decoded_data
 
     def _handle_ping(self, line):
@@ -149,7 +145,7 @@ class IRCBot:
         if nick == self.nickname:
             if channel not in self.channels:
                 self.channels.append(channel)
-            print(term.green(f"Bot successfully joined {channel}"))
+            logger.info(f"Bot successfully joined {channel}")
 
     def _handle_ping_stats(self, processing_time):
         """Handles PING messages and updates statistics."""
@@ -159,11 +155,7 @@ class IRCBot:
 
         if self.ping_stats["count"] % 10 == 0:
             avg_ping_time = self.ping_stats["total_time"] / self.ping_stats["count"]
-            print(
-                term.yellow(
-                    f"Average ping processing time: {avg_ping_time:.4f} seconds"
-                )
-            )
+            logger.warning(f"Average ping processing time: {avg_ping_time:.4f} seconds")
             self.ping_stats["count"] = 0
             self.ping_stats["total_time"] = 0.0
             self.ping_stats["times"].clear()
@@ -177,7 +169,7 @@ class IRCBot:
             "403": "Error joining channel: No such channel.",
         }
         if reply_code in error_messages:
-            print(term.red(f"{error_messages[reply_code]} {reply_text}"))
+            logger.error(f"{error_messages[reply_code]} {reply_text}")
 
         # 433: Nickname is already in use
         # 437: Nick/channel is temporarily unavailable
@@ -187,18 +179,18 @@ class IRCBot:
                 self.nickname = alt_nick
             else:
                 self.nickname += "_"
-            print(term.yellow(f"Nickname unavailable ({reply_code}). Trying new nick: {self.nickname}"))
+            logger.warning(f"Nickname unavailable ({reply_code}). Trying new nick: {self.nickname}")
             self.send_raw(f"NICK {self.nickname}\r\n")
 
         # 001: RPL_WELCOME (Registration successful)
         if reply_code == "001":
-            print(term.green("Successfully registered with server. Joining channels..."))
+            logger.info("Successfully registered with server. Joining channels...")
             for channel in self.channels:
                 self.join_channel(channel)
 
     def _trigger_heavy_crawler(self, url):
         """Helper to invoke the Selenium AI heavy crawler."""
-        print(term.yellow(f"Triggering heavy crawler for {url}..."))
+        logger.warning(f"Triggering heavy crawler for {url}...")
         try:
             crawler_url = os.environ.get("CRAWLER_API_URL", "http://127.0.0.1:8000/resolve")
             heavy_response = requests.post(crawler_url, json={"url": url}, timeout=60)
@@ -206,7 +198,7 @@ class IRCBot:
             if heavy_response.json().get("summary"):
                 return heavy_response.json()["summary"]
         except Exception as heavy_err:
-            print(term.red(f"Heavy crawler failed: {heavy_err}"))
+            logger.error(f"Heavy crawler failed: {heavy_err}")
         return None
 
     def _get_url_info(self, url):
@@ -224,9 +216,9 @@ class IRCBot:
 
             content_type = response.headers.get("Content-Type")
             file_type, encoding = mimetypes.guess_type(url)
-            print(term.green(f"Encoding: {encoding}"))
-            print(term.green(f"Content-Type: {content_type}"))
-            print(term.green(f"Guessed File Type: {file_type}"))
+            logger.info(f"Encoding: {encoding}")
+            logger.info(f"Content-Type: {content_type}")
+            logger.info(f"Guessed File Type: {file_type}")
 
             if content_type and "text/html" in content_type:
                 chunk_size = 1024
@@ -234,17 +226,13 @@ class IRCBot:
                 for chunk in response.iter_content(chunk_size=chunk_size):
                     content += chunk
                     if len(content) > 1024 * 1024:  # Limit to 1MB
-                        print(
-                            term.yellow("HTML content truncated (1MB limit reached).")
-                        )
+                        logger.warning("HTML content truncated (1MB limit reached).")
                         break
                 soup = BeautifulSoup(content, "html.parser")
                 title = soup.title.string.strip() if soup.title else None
                 description_meta = soup.find("meta", attrs={"name": "description"})
                 if not description_meta:
-                    description_meta = soup.find(
-                        "meta", attrs={"property": "og:description"}
-                    )
+                    description_meta = soup.find("meta", attrs={"property": "og:description"})
                 if description_meta and description_meta.has_attr("content"):
                     description = description_meta["content"].strip()
                 else:
@@ -256,10 +244,10 @@ class IRCBot:
                     "accept cookies",
                     "attention required!",
                     "ennen kuin jatkat",
-                    "before you continue"
+                    "before you continue",
                 ]
                 if not title or any(wall in title_lower for wall in cookie_walls):
-                    print(term.yellow("Possible cookie wall or missing title."))
+                    logger.warning("Possible cookie wall or missing title.")
                     summary = self._trigger_heavy_crawler(url)
                     if summary:
                         return file_type, "AI Summary", summary
@@ -269,15 +257,19 @@ class IRCBot:
             return file_type, None, None
 
         except requests.exceptions.RequestException as e:
-            print(term.red(f"Error fetching URL {url}: {e}"))
-            if hasattr(e, 'response') and e.response is not None and e.response.status_code in [401, 403, 406, 429, 503]:
-                print(term.yellow(f"Blocked by server ({e.response.status_code}). Falling back to heavy crawler..."))
+            logger.error(f"Error fetching URL {url}: {e}")
+            if (
+                hasattr(e, "response")
+                and e.response is not None
+                and e.response.status_code in [401, 403, 406, 429, 503]
+            ):
+                logger.warning(f"Blocked by server ({e.response.status_code}). Falling back to heavy crawler...")
                 summary = self._trigger_heavy_crawler(url)
                 if summary:
                     return None, "AI Summary", summary
             return None, None, None
         # except Exception as e:
-        #    print(term.red(f"An unexpected error occurred while processing url {url}: {e}"))
+        #    logger.error(f"An unexpected error occurred while processing url {url}: {e}")
         traceback.print_exc()
         return None, None, None
 
@@ -287,12 +279,12 @@ class IRCBot:
 
     def _process_url_worker(self, url, target=None):
         """Worker method for URL parsing to avoid blocking."""
-        print(term.green(f"Detected URL: {url}"))
+        logger.info(f"Detected URL: {url}")
         if validators.url(url):
-            print(term.green(f"{url} is a valid URL"))
+            logger.info(f"{url} is a valid URL")
             file_type, title, description = self._get_url_info(url)
             if file_type:
-                print(term.green(f"File Type: {file_type}"))
+                logger.info(f"File Type: {file_type}")
             if title and target:  # Only send message if target is given
                 for line in str(title).splitlines():
                     if line.strip():
@@ -302,7 +294,7 @@ class IRCBot:
                     if line.strip():
                         self.send_message(target, line.strip())
         else:
-            print(term.red(f"{url} is not a valid URL"))
+            logger.error(f"{url} is not a valid URL")
 
     def _is_ping(self, line):
         return line.startswith("PING")
@@ -335,9 +327,7 @@ class IRCBot:
             for url in url_match:
                 self._handle_url(url, reply_target)
 
-        self._handle_privmsg_content(
-            sender, reply_target, message
-        )  # Handle the message content
+        self._handle_privmsg_content(sender, reply_target, message)  # Handle the message content
 
     def _handle_privmsg_content(self, sender, target, message):
         """Handles the actual content of a PRIVMSG (commands, etc.)."""
@@ -353,7 +343,7 @@ class IRCBot:
                 line = line.strip()
                 if not line:
                     continue
-                print(f"Received: {line}")
+                logger.info(f"Received: {line}")
 
                 if self._is_ping(line):
                     processing_time = time.time()
@@ -369,9 +359,7 @@ class IRCBot:
                     continue
 
                 if match_numeric := self._find_numeric_match(line):
-                    self._handle_numeric_reply(
-                        match_numeric.group(1), match_numeric.group(2)
-                    )
+                    self._handle_numeric_reply(match_numeric.group(1), match_numeric.group(2))
                     continue
 
                 if match_privmsg := self._find_privmsg_match(line):
@@ -385,15 +373,13 @@ class IRCBot:
                         self._handle_url(url)
 
         except (UnicodeDecodeError, IOError) as e:
-            print(term.red(f"Error in process_data: {e}"))
+            logger.error(f"Error in process_data: {e}")
             traceback.print_exc()
         finally:
             # Handle stats for non ping messages
             if not self._is_ping(line) and not self._is_pong(line):
                 processing_time = time.time() - start_time
-                print(
-                    term.yellow(f"Processed message in {processing_time:.4f} seconds")
-                )
+                logger.warning(f"Processed message in {processing_time:.4f} seconds")
 
     def channel_worker(self, channel, message_queue):
         """Worker thread for handling a specific channel."""
@@ -405,24 +391,24 @@ class IRCBot:
                 except queue.Empty:
                     continue
                 except (UnicodeDecodeError, IOError) as e:
-                    print(term.red(f"Error processing message in {channel}: {e}"))
+                    logger.error(f"Error processing message in {channel}: {e}")
                     traceback.print_exc()
         except (UnicodeDecodeError, IOError) as e:
-            print(term.red(f"Error in channel worker for {channel}: {e}"))
+            logger.error(f"Error in channel worker for {channel}: {e}")
             traceback.print_exc()
 
     def reconnect(self):
         """Reconnects with enhanced error handling."""
-        print(term.green("Reconnecting..."))
+        logger.info("Reconnecting...")
         self.disconnect()
         if not self.connect():
-            print(term.red("Reconnection failed."))
+            logger.error("Reconnection failed.")
             self.running = False
 
     def run(self):
         """Main bot loop with robust error handling and reconnection."""
         if not self.connect():
-            print(term.red("Initial connection failed. Exiting."))
+            logger.error("Initial connection failed. Exiting.")
             return
 
         channel_queues = {channel: queue.Queue() for channel in self.channels}
@@ -441,25 +427,25 @@ class IRCBot:
                 try:
                     raw_data = self.connection.recv_data()
                     if not raw_data:
-                        print(term.red("Connection lost."))
+                        logger.error("Connection lost.")
                         self.reconnect()
                         continue
 
                     for line in raw_data.split(b"\r\n"):
                         self.process_data(line)
                 except socket.timeout:
-                    print(term.red("Socket timed out while receiving data."))
+                    logger.error("Socket timed out while receiving data.")
                     self.reconnect()
                 except socket.error as e:
-                    print(term.red(f"Socket error: {e}"))
+                    logger.error(f"Socket error: {e}")
                     self.reconnect()
                 except UnicodeDecodeError as e:
-                    print(term.red(f"An unexpected error occurred in main loop: {e}"))
+                    logger.error(f"An unexpected error occurred in main loop: {e}")
                     traceback.print_exc()
                     self.running = False
                     break
         except KeyboardInterrupt:
-            print(term.red("Disconnecting..."))
+            logger.error("Disconnecting...")
             self.running = False
         finally:
             for thread in channel_threads.values():
@@ -472,13 +458,13 @@ def log_resource_usage():
     process = psutil.Process()
     memory_info = process.memory_info()
     cpu_percent = process.cpu_percent(interval=1)
-    print(term.blue(f"Memory usage: {memory_info.rss / 1024 / 1024:.2f} MB"))
-    print(term.blue(f"CPU usage: {cpu_percent:.2f}%"))
+    logger.info(f"Memory usage: {memory_info.rss / 1024 / 1024:.2f} MB")
+    logger.info(f"CPU usage: {cpu_percent:.2f}%")
 
 
 if __name__ == "__main__":
     Bot = IRCBot()
     #    Bot.register_command("!hello", hello_command)
     #    Bot.register_command("!join", join_command)
-    print(term.green("Starting bot .."))
+    logger.info("Starting bot ..")
     Bot.run()
