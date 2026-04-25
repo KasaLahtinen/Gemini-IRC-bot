@@ -7,3 +7,4 @@ __pycache__/commands.cpython-313.pyc
 .gitignore
 .gitignore
 __pycache__/commands.cpython-314.pyc
+config.yaml
