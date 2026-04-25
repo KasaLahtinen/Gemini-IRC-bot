@@ -1,8 +1,6 @@
 # bot.py
 """This module contains the IRCBot class and its related functions."""
 
-import mimetypes
-import os
 import queue
 
 # import ssl
@@ -17,16 +15,16 @@ from concurrent.futures import ThreadPoolExecutor
 
 import chardet
 import psutil
-import requests
 import validators
 import yaml
-from bs4 import BeautifulSoup
 from commands import (
     Command,
     CommandManager,
+    heavy_command,
     hello_command,
 )  # Import the command classes
 from connection import Connection
+from link_preview import get_link_preview
 from loguru import logger
 
 
@@ -62,6 +60,8 @@ class IRCBot:
         self.nickname = self.config["bot"]["nickname"]
         self.channels = self.config["bot"]["channels"]
         self.ping_stats = {"count": 0, "total_time": 0.0, "times": deque()}
+        self.cooldowns = {}
+        self.heavy_cooldowns = {}
         self.command_manager = CommandManager()  # Create CommandManager instance
         self.register_commands()
 
@@ -74,6 +74,7 @@ class IRCBot:
     def register_commands(self):
         """Registers the commands through CommandManager"""
         self.command_manager.register(Command("!hello", hello_command, "Says hello"))
+        self.command_manager.register(Command("!heavy", heavy_command, "Force heavy crawler for URL"))
 
     #        self.command_manager.register(Command("!join", join_command, "Joins a channel"))
 
@@ -188,109 +189,50 @@ class IRCBot:
             for channel in self.channels:
                 self.join_channel(channel)
 
-    def _trigger_heavy_crawler(self, url):
-        """Helper to invoke the Selenium AI heavy crawler."""
-        logger.warning(f"Triggering heavy crawler for {url}...")
-        try:
-            crawler_url = os.environ.get("CRAWLER_API_URL", "http://127.0.0.1:8000/resolve")
-            heavy_response = requests.post(crawler_url, json={"url": url}, timeout=60)
-            heavy_response.raise_for_status()
-            if heavy_response.json().get("summary"):
-                return heavy_response.json()["summary"]
-        except Exception as heavy_err:
-            logger.error(f"Heavy crawler failed: {heavy_err}")
-        return None
-
-    def _get_url_info(self, url):
-        """Fetches URL, determines file type, and extracts HTML metadata."""
-        try:
-            headers = {
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/119.0.0.0 Safari/537.36"
-                )
-            }
-            response = requests.get(url, stream=True, timeout=5, headers=headers)
-            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-
-            content_type = response.headers.get("Content-Type")
-            file_type, encoding = mimetypes.guess_type(url)
-            logger.info(f"Encoding: {encoding}")
-            logger.info(f"Content-Type: {content_type}")
-            logger.info(f"Guessed File Type: {file_type}")
-
-            if content_type and "text/html" in content_type:
-                chunk_size = 1024
-                content = b""
-                for chunk in response.iter_content(chunk_size=chunk_size):
-                    content += chunk
-                    if len(content) > 1024 * 1024:  # Limit to 1MB
-                        logger.warning("HTML content truncated (1MB limit reached).")
-                        break
-                soup = BeautifulSoup(content, "html.parser")
-                title = soup.title.string.strip() if soup.title else None
-                description_meta = soup.find("meta", attrs={"name": "description"})
-                if not description_meta:
-                    description_meta = soup.find("meta", attrs={"property": "og:description"})
-                if description_meta and description_meta.has_attr("content"):
-                    description = description_meta["content"].strip()
-                else:
-                    description = None
-
-                title_lower = title.lower() if title else ""
-                cookie_walls = [
-                    "just a moment...",
-                    "accept cookies",
-                    "attention required!",
-                    "ennen kuin jatkat",
-                    "before you continue",
-                ]
-                if not title or any(wall in title_lower for wall in cookie_walls):
-                    logger.warning("Possible cookie wall or missing title.")
-                    summary = self._trigger_heavy_crawler(url)
-                    if summary:
-                        return file_type, "AI Summary", summary
-
-                return file_type, title, description
-
-            return file_type, None, None
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching URL {url}: {e}")
-            if (
-                hasattr(e, "response")
-                and e.response is not None
-                and e.response.status_code in [401, 403, 406, 429, 503]
-            ):
-                logger.warning(f"Blocked by server ({e.response.status_code}). Falling back to heavy crawler...")
-                summary = self._trigger_heavy_crawler(url)
-                if summary:
-                    return None, "AI Summary", summary
-            return None, None, None
-        # except Exception as e:
-        #    logger.error(f"An unexpected error occurred while processing url {url}: {e}")
-        traceback.print_exc()
-        return None, None, None
-
-    def _handle_url(self, url, target=None):  # Target now optional
+    def _handle_url(self, url, target=None, sender=None):  # Target and sender optional
         """Handles URL detection and validation by delegating to a thread pool."""
+        if sender:
+            # We assume sender is just the nickname part.
+            sender_nick = sender.split("!")[0]
+            last_scrape = self.cooldowns.get(sender_nick, 0)
+            if time.time() - last_scrape < 5:
+                logger.warning(f"Rate limited URL scrape for {sender_nick}")
+                return
+            self.cooldowns[sender_nick] = time.time()
         self.url_pool.submit(self._process_url_worker, url, target)
+
+    def _handle_heavy_url(self, url, target=None, sender=None):
+        """Forces heavy crawler for a URL."""
+        if sender:
+            sender_nick = sender.split("!")[0]
+            last_scrape = self.heavy_cooldowns.get(sender_nick, 0)
+            if time.time() - last_scrape < 30:
+                logger.warning(f"Rate limited heavy scrape for {sender_nick}")
+                return
+            self.heavy_cooldowns[sender_nick] = time.time()
+        self.url_pool.submit(self._process_heavy_url_worker, url, target)
+
+    def _process_heavy_url_worker(self, url, target=None):
+        """Worker method for heavy URL parsing to avoid blocking."""
+        logger.info(f"Detected heavy URL: {url}")
+        if validators.url(url):
+            logger.info(f"{url} is a valid URL")
+            preview_text = get_link_preview(url, force_heavy=True)
+            if preview_text and target:
+                for line in preview_text.splitlines():
+                    if line.strip():
+                        self.send_message(target, line.strip())
+        else:
+            logger.error(f"{url} is not a valid URL")
 
     def _process_url_worker(self, url, target=None):
         """Worker method for URL parsing to avoid blocking."""
         logger.info(f"Detected URL: {url}")
         if validators.url(url):
             logger.info(f"{url} is a valid URL")
-            file_type, title, description = self._get_url_info(url)
-            if file_type:
-                logger.info(f"File Type: {file_type}")
-            if title and target:  # Only send message if target is given
-                for line in str(title).splitlines():
-                    if line.strip():
-                        self.send_message(target, line.strip())
-            if description and target:  # Only send message if target is given
-                for line in str(description).splitlines():
+            preview_text = get_link_preview(url)
+            if preview_text and target:  # Only send message if target is given
+                for line in preview_text.splitlines():
                     if line.strip():
                         self.send_message(target, line.strip())
         else:
@@ -325,7 +267,7 @@ class IRCBot:
         url_match = re.findall(url_regex, message)
         if url_match:
             for url in url_match:
-                self._handle_url(url, reply_target)
+                self._handle_url(url, reply_target, sender)
 
         self._handle_privmsg_content(sender, reply_target, message)  # Handle the message content
 

@@ -3,6 +3,7 @@
 
 import traceback
 
+import validators
 from loguru import logger
 
 
@@ -83,3 +84,18 @@ def join_command(bot, target, sender, *args):
         bot.send_message(target, f"Joining {channel_to_join} as requested by {sender}")
     else:
         bot.send_message(target, "Usage: !join #channel")
+
+
+def heavy_command(bot, target, sender, *args):
+    """Invokes the heavy AI crawler on a URL."""
+    if not args:
+        if sender:
+            bot.send_message(target, "Usage: !heavy <url>")
+        return
+
+    url = args[0]
+    if validators.url(url):
+        bot._handle_heavy_url(url, target, sender)
+    else:
+        if sender:
+            bot.send_message(target, "Invalid URL provided.")
