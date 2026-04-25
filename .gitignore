@@ -1,4 +1,9 @@
-.vscode/settings.json
-.idx/dev.nix
-__pycache__
-.vscode
+Gemini-IRC-bot.code-workspace
+.vscode/extensions.json
+tests/__pycache__/test_bot.cpython-313.pyc
+.gitignore
+__pycache__/connection.cpython-313.pyc
+__pycache__/commands.cpython-313.pyc
+.gitignore
+.gitignore
+__pycache__/commands.cpython-314.pyc

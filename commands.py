@@ -53,8 +53,8 @@ class CommandManager:
             args = parts[1:]
             if command_name in self.commands:
                 self.commands[command_name].execute(bot, target, sender, *args)
-            else:
-                logging.error("Unknown command: %s", command_name)
+            elif command_name.startswith("!"):
+                logging.debug("Unknown command: %s", command_name)
 
 
 # Example command functions (can be in separate files later)

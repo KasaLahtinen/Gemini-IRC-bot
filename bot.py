@@ -2,11 +2,13 @@
 """This module contains the IRCBot class and its related functions."""
 
 import sys
+import os
 import socket
 #import ssl
 import re
 import threading
 import queue
+from concurrent.futures import ThreadPoolExecutor
 import traceback
 import mimetypes
 import time
@@ -63,6 +65,8 @@ class IRCBot:
         self.command_manager = CommandManager()  # Create CommandManager instance
         self.register_commands()
 
+        self.url_pool = ThreadPoolExecutor(max_workers=5)
+
         # Get thread_pool_size with a default value
 
     #        self.thread_pool_size = self.config.get("thread_pool_size", 4)
@@ -88,8 +92,7 @@ class IRCBot:
     def connect(self):
         """Connects to the IRC server."""
         self.connection.connect()
-        for channel in self.channels:
-            self.join_channel(channel)
+        # Removed immediate join_channel calls; we will join upon 001 RPL_WELCOME.
         return self.connection.sock
 
     def disconnect(self):
@@ -174,6 +177,36 @@ class IRCBot:
         if reply_code in error_messages:
             print(term.red(f"{error_messages[reply_code]} {reply_text}"))
 
+        # 433: Nickname is already in use
+        # 437: Nick/channel is temporarily unavailable
+        if reply_code in ["433", "437"]:
+            alt_nick = self.config["bot"].get("alt_nickname")
+            if alt_nick and self.nickname != alt_nick and not self.nickname.endswith("_"):
+                self.nickname = alt_nick
+            else:
+                self.nickname += "_"
+            print(term.yellow(f"Nickname unavailable ({reply_code}). Trying new nick: {self.nickname}"))
+            self.send_raw(f"NICK {self.nickname}\r\n")
+
+        # 001: RPL_WELCOME (Registration successful)
+        if reply_code == "001":
+            print(term.green("Successfully registered with server. Joining channels..."))
+            for channel in self.channels:
+                self.join_channel(channel)
+
+    def _trigger_heavy_crawler(self, url):
+        """Helper to invoke the Selenium AI heavy crawler."""
+        print(term.yellow(f"Triggering heavy crawler for {url}..."))
+        try:
+            crawler_url = os.environ.get("CRAWLER_API_URL", "http://127.0.0.1:8000/resolve")
+            heavy_response = requests.post(crawler_url, json={"url": url}, timeout=60)
+            heavy_response.raise_for_status()
+            if heavy_response.json().get("summary"):
+                return heavy_response.json()["summary"]
+        except Exception as heavy_err:
+            print(term.red(f"Heavy crawler failed: {heavy_err}"))
+        return None
+
     def _get_url_info(self, url):
         """Fetches URL, determines file type, and extracts HTML metadata."""
         try:
@@ -214,12 +247,32 @@ class IRCBot:
                     description = description_meta["content"].strip()
                 else:
                     description = None
+
+                title_lower = title.lower() if title else ""
+                cookie_walls = [
+                    "just a moment...",
+                    "accept cookies",
+                    "attention required!",
+                    "ennen kuin jatkat",
+                    "before you continue"
+                ]
+                if not title or any(wall in title_lower for wall in cookie_walls):
+                    print(term.yellow("Possible cookie wall or missing title."))
+                    summary = self._trigger_heavy_crawler(url)
+                    if summary:
+                        return file_type, "AI Summary", summary
+
                 return file_type, title, description
 
             return file_type, None, None
 
         except requests.exceptions.RequestException as e:
             print(term.red(f"Error fetching URL {url}: {e}"))
+            if hasattr(e, 'response') and e.response is not None and e.response.status_code in [401, 403, 406, 429, 503]:
+                print(term.yellow(f"Blocked by server ({e.response.status_code}). Falling back to heavy crawler..."))
+                summary = self._trigger_heavy_crawler(url)
+                if summary:
+                    return None, "AI Summary", summary
             return None, None, None
         # except Exception as e:
         #    print(term.red(f"An unexpected error occurred while processing url {url}: {e}"))
@@ -227,7 +280,11 @@ class IRCBot:
         return None, None, None
 
     def _handle_url(self, url, target=None):  # Target now optional
-        """Handles URL detection and validation."""
+        """Handles URL detection and validation by delegating to a thread pool."""
+        self.url_pool.submit(self._process_url_worker, url, target)
+
+    def _process_url_worker(self, url, target=None):
+        """Worker method for URL parsing to avoid blocking."""
         print(term.green(f"Detected URL: {url}"))
         if validators.url(url):
             print(term.green(f"{url} is a valid URL"))
@@ -235,9 +292,13 @@ class IRCBot:
             if file_type:
                 print(term.green(f"File Type: {file_type}"))
             if title and target:  # Only send message if target is given
-                self.send_message(target, f"Title: {title}")
+                for line in str(title).splitlines():
+                    if line.strip():
+                        self.send_message(target, line.strip())
             if description and target:  # Only send message if target is given
-                self.send_message(target, f"Description: {description}")
+                for line in str(description).splitlines():
+                    if line.strip():
+                        self.send_message(target, line.strip())
         else:
             print(term.red(f"{url} is not a valid URL"))
 
@@ -259,14 +320,21 @@ class IRCBot:
     def _handle_privmsg(self, match_privmsg):
         sender, target, message = match_privmsg.groups()
 
+        # Ignore messages sent by the bot itself to prevent loops
+        if sender == self.nickname:
+            return
+
+        # If the bot is PM'd directly, reply to the sender instead of the bot's own nick
+        reply_target = sender if target == self.nickname else target
+
         url_regex = r"\b(https?:\/\/[^\s]+)"
         url_match = re.findall(url_regex, message)
         if url_match:
             for url in url_match:
-                self._handle_url(url, target)
+                self._handle_url(url, reply_target)
 
         self._handle_privmsg_content(
-            sender, target, message
+            sender, reply_target, message
         )  # Handle the message content
 
     def _handle_privmsg_content(self, sender, target, message):
