@@ -265,7 +265,11 @@ class IRCBot:
 
         url_regex = r"\b(https?:\/\/[^\s]+)"
         url_match = re.findall(url_regex, message)
-        if url_match:
+        
+        # Prevent default scraper from firing if the user explicitly used !heavy
+        is_heavy_command = message.strip().lower().startswith("!heavy")
+        
+        if url_match and not is_heavy_command:
             for url in url_match:
                 self._handle_url(url, reply_target, sender)
 
