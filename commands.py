@@ -1,8 +1,9 @@
 # commands.py
 """This module contains the Command and CommandManager classes and related functions."""
 
-import logging
 import traceback
+
+from loguru import logger
 
 
 class Command:
@@ -22,13 +23,13 @@ class Command:
         try:
             self.handler(bot, target, sender, *args)
         except TypeError as e:
-            logging.error(
+            logger.error(
                 "Error executing command %s: %s. Check function signature.",
                 self.name,
                 e,
             )
         except (ValueError, IOError) as e:
-            logging.error(
+            logger.error(
                 "An error occurred while executing command %s: %s", self.name, e
             )
         traceback.print_exc()
@@ -54,7 +55,7 @@ class CommandManager:
             if command_name in self.commands:
                 self.commands[command_name].execute(bot, target, sender, *args)
             elif command_name.startswith("!"):
-                logging.debug("Unknown command: %s", command_name)
+                logger.debug("Unknown command: %s", command_name)
 
 
 # Example command functions (can be in separate files later)
@@ -64,7 +65,7 @@ def hello_command(bot, target, sender, *args):
         bot.send_message(target, f"Hello, {sender}!")
     else:
         bot.send_message(target, "Hello!")
-    logging.debug(args)
+    logger.debug(args)
 
 
 def join_command(bot, target, sender, *args):

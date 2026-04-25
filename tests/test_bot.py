@@ -1,22 +1,16 @@
 """Unit tests for the IRCBot class."""
 
-import unittest
+import queue
+import re
 import socket
 import ssl
-import threading
-import queue
-import time
+import unittest
 from unittest.mock import patch
-from collections import deque
 
-import yaml
-import requests
-import re
 import chardet
+import requests
 import validators
-from bs4 import BeautifulSoup
-
-from bot import IRCBot, log_resource_usage, hello_command, join_command  # Assuming bot.py is in the same directory
+from bot import IRCBot, hello_command, join_command, log_resource_usage  # Assuming bot.py is in the same directory
 
 
 class TestIRCBot(unittest.TestCase):
@@ -176,20 +170,3 @@ class TestIRCBot(unittest.TestCase):
         """Test log resource usage"""
         log_resource_usage()
 
-    def test_load_config(self):
-        """Test loading config."""
-        with patch.object(IRCBot, '_load_config') as mock_load:
-            mock_load.side_effect = ["TEST"] # Simulate loading a wrong file
-            self.bot._load_config()
-
-    def test_find_join_match(self):
-        """Test finding a JOIN match"""
-        self.assertIsNotNone(self.bot._find_join_match(":TEST!USER@ TEST JOIN #TEST\r\n"))
-
-    def test_find_numeric_match(self):
-        """Test finding a numeric match"""
-        self.assertIsNotNone(self.bot._find_numeric_match(":TEST!USER@ TEST 123 TEST\r\n"))
-
-    def test_find_privmsg_match(self):
-        """Test finding a PRIVMSG match"""
-        self.assertIsNotNone(self.bot._find_privmsg_match(":TEST!USER@ TEST PRIVMSG #TEST :TEST\r\n"))

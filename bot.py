@@ -1,31 +1,33 @@
 # bot.py
 """This module contains the IRCBot class and its related functions."""
 
-import sys
+import mimetypes
 import os
-import socket
+import queue
+
 #import ssl
 import re
+import socket
+import sys
 import threading
-import queue
-from concurrent.futures import ThreadPoolExecutor
-import traceback
-import mimetypes
 import time
+import traceback
 from collections import deque
-import psutil
+from concurrent.futures import ThreadPoolExecutor
+
 import chardet
-import validators
-from blessed import Terminal
-import yaml
+import psutil
 import requests
+import validators
+import yaml
+from blessed import Terminal
 from bs4 import BeautifulSoup
-from connection import Connection
 from commands import (
     Command,
     CommandManager,
     hello_command,
 )  # Import the command classes
+from connection import Connection
 
 term = Terminal()
 
