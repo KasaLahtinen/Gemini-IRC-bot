@@ -10,7 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 from loguru import logger
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "cache.db")
+DB_PATH = os.environ.get("CACHE_DB_PATH", os.path.join(os.path.dirname(__file__), "cache.db"))
 
 
 def init_db():
